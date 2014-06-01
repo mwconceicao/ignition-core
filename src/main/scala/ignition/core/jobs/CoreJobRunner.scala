@@ -43,7 +43,7 @@ object CoreJobRunner {
 
       val appName = s"${config.setupName}.${config.tag}"
       val sc = new SparkContext(config.master, appName,
-        System.getenv("SPARK_HOME"), SparkContext.jarOfClass(this.getClass))
+        System.getenv("SPARK_HOME"), SparkContext.jarOfClass(this.getClass).toSeq)
 
       val context = RunnerContext(sc, config)
 
