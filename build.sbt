@@ -20,7 +20,7 @@ parallelExecution in Test := false
 
 libraryDependencies ++= Seq()
 
-libraryDependencies += ("org.apache.spark" %% "spark-core" % "0.9.1" % "provided")
+libraryDependencies += ("org.apache.spark" %% "spark-core" % "1.0.0" % "provided")
 
 libraryDependencies += ("org.apache.hadoop" % "hadoop-client" % "2.2.0" % "provided")
 
