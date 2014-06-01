@@ -30,15 +30,15 @@ libraryDependencies += "org.json4s" %% "json4s-jackson" % "3.2.8"
 
 libraryDependencies += "org.json4s" %% "json4s-ext" % "3.2.8"
 
-libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.2.2"  % "provided"
+libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.3.0"  % "provided"
 
-libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.2.2" % "provided"
+libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.3.0" % "provided"
 
-libraryDependencies += "com.fasterxml.jackson.datatype" % "jackson-datatype-joda" % "2.2.2"
+libraryDependencies += "com.fasterxml.jackson.datatype" % "jackson-datatype-joda" % "2.3.0"
 
-libraryDependencies += "com.fasterxml.jackson.module" % "jackson-module-afterburner" % "2.2.2"
+libraryDependencies += "com.fasterxml.jackson.module" % "jackson-module-afterburner" % "2.3.0"
 
-libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.2.2"
+libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.3.0"
 
 libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "0.8.0"
 
