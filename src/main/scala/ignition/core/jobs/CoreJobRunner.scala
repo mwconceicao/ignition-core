@@ -13,7 +13,7 @@ object CoreJobRunner {
                           date: DateTime = DateTime.now,
                           tag: String = "notag",
                           user: String = "nouser",
-                          master: String = "local[4]")
+                          master: String = "local[*]")
 
   def runJobSetup(args: Array[String], jobsSetups: Map[String, (RunnerContext) => Unit]) {
     val parser = new scopt.OptionParser[RunnerConfig]("Runner") {
