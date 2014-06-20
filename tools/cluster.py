@@ -60,9 +60,13 @@ def logged_call_base(func, args, tries):
     log.debug('Calling: %s', args)
     return func(args)
 
-# We suppose we are in a sub sub director of the root (like: root-project/core/tools/cluster.py)
+# We suppose we are in a sub sub directory of the root (like: root-project/core/tools/cluster.py)
+def get_module_path():
+    return os.path.realpath(os.path.join(script_path, '..'))
+
 def get_project_path():
-    return os.path.realpath(os.path.join(script_path, '../..'))
+    return os.path.realpath(os.path.join(get_module_path(), '..'))
+
 
 
 def logged_call_output(args, tries=1):
@@ -212,18 +216,20 @@ def job_run(cluster_name, job_name, job_mem, key_file, disable_tmux=False,
 
     project_path = get_project_path()
     project_name = os.path.basename(project_path)
+    module_name = os.path.basename(get_module_path())
     # Use job user on remote path to avoid too many conflicts for different local users
     remote_path = remote_path or '/home/%s/%s.%s' % (default_remote_user, job_user, project_name)
     remote_app_path = remote_path
+    remote_hook = '{remote_app_path}/{module_name}/remote_hook.sh'.format(remote_app_path=remote_app_path, module_name=module_name)
     notify_param = 'yes' if notify_on_errors else 'no'
     yarn_param = 'yes' if yarn else 'no'
     job_date = utc_job_date or datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     job_tag = job_tag or job_date.replace(':', '_').replace('-', '_').replace('Z', 'UTC')
     tmux_wait_command = ';(echo Press enter to keep the session open && /bin/bash -c "read -t 5" && sleep 7d)' if not detached else ''
-    tmux_arg = ". /etc/profile; . ~/.profile;tmux new-session {detached} -s spark.{job_name}.{job_tag} '{remote_app_path}/remote_hook.sh {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param} {tmux_wait_command}'".format(
-        job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_app_path=remote_app_path, spark_mem=job_mem, detached='-d' if detached else '', yarn_param=yarn_param, notify_param=notify_param, tmux_wait_command=tmux_wait_command)
-    non_tmux_arg = ". /etc/profile; . ~/.profile;{remote_app_path}/remote_hook.sh {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param}".format(
-        job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_app_path=remote_app_path, spark_mem=job_mem, yarn_param=yarn_param, notify_param=notify_param)
+    tmux_arg = ". /etc/profile; . ~/.profile;tmux new-session {detached} -s spark.{job_name}.{job_tag} '{remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param} {tmux_wait_command}'".format(
+        job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, detached='-d' if detached else '', yarn_param=yarn_param, notify_param=notify_param, tmux_wait_command=tmux_wait_command)
+    non_tmux_arg = ". /etc/profile; . ~/.profile;{remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param}".format(
+        job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, yarn_param=yarn_param, notify_param=notify_param)
     rsync_args = ['rsync', '--timeout', '60']
     rsync_args += reduce(chain, (['--exclude', i]
                 for i in ('.git', 'target', 'tools',
