@@ -1,6 +1,7 @@
 #!/bin/bash
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# We suppose we are in a subdirectory of the root project
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 
 JOB_NAME="${1:?Please give a Job Name}"
 JOB_DATE="${2?Please give the Job Date}"

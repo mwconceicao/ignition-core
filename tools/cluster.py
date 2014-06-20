@@ -60,6 +60,10 @@ def logged_call_base(func, args, tries):
     log.debug('Calling: %s', args)
     return func(args)
 
+# We suppose we are in a sub sub director of the root (like: root-project/core/tools/cluster.py)
+def get_project_path():
+    return os.path.realpath(os.path.join(script_path, '../..'))
+
 
 def logged_call_output(args, tries=1):
     return logged_call_base(check_output, args, tries)
@@ -205,7 +209,8 @@ def job_run(cluster_name, job_name, job_mem, key_file, disable_tmux=False,
     disable_tmux = disable_tmux and not detached
     wait_completion = not disable_wait_completion or destroy_cluster
     master = master or get_master(cluster_name)
-    project_path = os.path.realpath(os.path.join(script_path, '..'))
+
+    project_path = get_project_path()
     project_name = os.path.basename(project_path)
     # Use job user on remote path to avoid too many conflicts for different local users
     remote_path = remote_path or '/home/%s/%s.%s' % (default_remote_user, job_user, project_name)
