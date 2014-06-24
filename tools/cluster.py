@@ -31,9 +31,9 @@ log.addHandler(handler)
 
 script_path = os.path.dirname(os.path.realpath(__file__))
 
-default_instance_type = 'r3.xlarge'
-default_spot_price = '0.05'
-default_worker_instances = '1'
+default_instance_type = 'r3.2xlarge'
+default_spot_price = '0.10'
+default_worker_instances = '2'
 default_master_instance_type = 'c3.large'
 default_region = 'us-east-1'
 default_zone = default_region + 'b'
