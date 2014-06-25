@@ -136,8 +136,12 @@ def parse_args():
         help="Extra options to give to master through SPARK_MASTER_OPTS variable " +
              "(e.g -Dspark.worker.timeout=180)")
     parser.add_option(
-        "--user-data", type="string", default="",
-        help="Path to an optional user-data script to be executed in the machines")
+        "--authorized-address", type="string", default="0.0.0.0/0",
+        help="Address to authorize on created security groups (default: 0.0.0.0/0)")
+    parser.add_option(
+        "--additional-security-group", type="string", default="",
+        help="Additional security group to place the machines in")
+
 
 
     (opts, args) = parser.parse_args()
@@ -271,36 +275,31 @@ def launch_cluster(conn, opts, cluster_name):
     if opts.key_pair is None:
         print >> stderr, "ERROR: Must provide a key pair name (-k) to use on instances."
         sys.exit(1)
-
-    user_data_content = None
-    if opts.user_data:
-        with open(opts.user_data) as user_data_file:
-            user_data_content = user_data_file.read()
-
     print "Setting up security groups..."
     master_group = get_or_make_group(conn, cluster_name + "-master")
     slave_group = get_or_make_group(conn, cluster_name + "-slaves")
+    authorized_address = opts.authorized_address
     if master_group.rules == []:  # Group was just now created
         master_group.authorize(src_group=master_group)
         master_group.authorize(src_group=slave_group)
-        master_group.authorize('tcp', 22, 22, '0.0.0.0/0')
-        master_group.authorize('tcp', 8080, 8081, '0.0.0.0/0')
-        master_group.authorize('tcp', 19999, 19999, '0.0.0.0/0')
-        master_group.authorize('tcp', 50030, 50030, '0.0.0.0/0')
-        master_group.authorize('tcp', 50070, 50070, '0.0.0.0/0')
-        master_group.authorize('tcp', 60070, 60070, '0.0.0.0/0')
-        master_group.authorize('tcp', 4040, 4045, '0.0.0.0/0')
+        master_group.authorize('tcp', 22, 22, authorized_address)
+        master_group.authorize('tcp', 8080, 8081, authorized_address)
+        master_group.authorize('tcp', 19999, 19999, authorized_address)
+        master_group.authorize('tcp', 50030, 50030, authorized_address)
+        master_group.authorize('tcp', 50070, 50070, authorized_address)
+        master_group.authorize('tcp', 60070, 60070, authorized_address)
+        master_group.authorize('tcp', 4040, 4045, authorized_address)
         if opts.ganglia:
-            master_group.authorize('tcp', 5080, 5080, '0.0.0.0/0')
+            master_group.authorize('tcp', 5080, 5080, authorized_address)
     if slave_group.rules == []:  # Group was just now created
         slave_group.authorize(src_group=master_group)
         slave_group.authorize(src_group=slave_group)
-        slave_group.authorize('tcp', 22, 22, '0.0.0.0/0')
-        slave_group.authorize('tcp', 8080, 8081, '0.0.0.0/0')
-        slave_group.authorize('tcp', 50060, 50060, '0.0.0.0/0')
-        slave_group.authorize('tcp', 50075, 50075, '0.0.0.0/0')
-        slave_group.authorize('tcp', 60060, 60060, '0.0.0.0/0')
-        slave_group.authorize('tcp', 60075, 60075, '0.0.0.0/0')
+        slave_group.authorize('tcp', 22, 22, authorized_address)
+        slave_group.authorize('tcp', 8080, 8081, authorized_address)
+        slave_group.authorize('tcp', 50060, 50060, authorized_address)
+        slave_group.authorize('tcp', 50075, 50075, authorized_address)
+        slave_group.authorize('tcp', 60060, 60060, authorized_address)
+        slave_group.authorize('tcp', 60075, 60075, authorized_address)
 
     # Check if instances are already running in our groups
     existing_masters, existing_slaves = get_existing_cluster(conn, opts, cluster_name,
@@ -329,6 +328,12 @@ def launch_cluster(conn, opts, cluster_name):
         device.delete_on_termination = True
         block_map["/dev/sdv"] = device
 
+    additional_groups = []
+    if opts.additional_security_group:
+        additional_groups = [sg
+                             for sg in conn.get_all_security_groups()
+                             if opts.additional_security_group in (sg.name, sg.id)]
+
     # Launch slaves
     if opts.spot_price is not None:
         # Launch spot instances with the requested price
@@ -347,10 +352,9 @@ def launch_cluster(conn, opts, cluster_name):
                 placement=zone,
                 count=num_slaves_this_zone,
                 key_name=opts.key_pair,
-                security_groups=[slave_group],
+                security_groups=[slave_group] + additional_groups,
                 instance_type=opts.instance_type,
-                block_device_map=block_map,
-                user_data=user_data_content)
+                block_device_map=block_map)
             my_req_ids += [req.id for req in slave_reqs]
             i += 1
 
@@ -396,13 +400,12 @@ def launch_cluster(conn, opts, cluster_name):
             num_slaves_this_zone = get_partition(opts.slaves, num_zones, i)
             if num_slaves_this_zone > 0:
                 slave_res = image.run(key_name=opts.key_pair,
-                                      security_groups=[slave_group],
+                                      security_groups=[slave_group] + additional_groups,
                                       instance_type=opts.instance_type,
                                       placement=zone,
                                       min_count=num_slaves_this_zone,
                                       max_count=num_slaves_this_zone,
-                                      block_device_map=block_map,
-                                      user_data=user_data_content)
+                                      block_device_map=block_map)
                 slave_nodes += slave_res.instances
                 print "Launched %d slaves in %s, regid = %s" % (num_slaves_this_zone,
                                                                 zone, slave_res.id)
@@ -422,7 +425,7 @@ def launch_cluster(conn, opts, cluster_name):
         if opts.zone == 'all':
             opts.zone = random.choice(conn.get_all_zones()).name
         master_res = image.run(key_name=opts.key_pair,
-                               security_groups=[master_group],
+                               security_groups=[master_group] + additional_groups,
                                instance_type=master_type,
                                placement=opts.zone,
                                min_count=1,
@@ -782,12 +785,16 @@ def real_main():
         setup_cluster(conn, master_nodes, slave_nodes, opts, True)
 
     elif action == "destroy":
-        response = raw_input("Are you sure you want to destroy the cluster " +
-                             cluster_name + "?\nALL DATA ON ALL NODES WILL BE LOST!!\n" +
-                             "Destroy cluster " + cluster_name + " (y/N): ")
+        print "Are you sure you want to destroy the cluster %s?" % cluster_name
+        print "The following instances will be terminated:"
+        (master_nodes, slave_nodes) = get_existing_cluster(
+            conn, opts, cluster_name, die_on_error=False)
+        for inst in master_nodes + slave_nodes:
+            print "> %s" % inst.public_dns_name
+
+        msg = "ALL DATA ON ALL NODES WILL BE LOST!!\nDestroy cluster %s (y/N): " % cluster_name
+        response = raw_input(msg)
         if response == "y":
-            (master_nodes, slave_nodes) = get_existing_cluster(
-                conn, opts, cluster_name, die_on_error=False)
             print "Terminating master..."
             for inst in master_nodes:
                 inst.terminate()
