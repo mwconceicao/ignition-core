@@ -16,9 +16,9 @@ def parse_nodes(active_instances, cluster_name):
     slave_nodes = []
     for instance in active_instances:
         group_names = [g.name for g in instance.groups]
-        if group_names == [cluster_name + '-master']:
+        if (cluster_name + "-master") in group_names:
             master_nodes.append(instance)
-        elif group_names == [cluster_name + '-slaves']:
+        elif (cluster_name + "-slaves") in group_names:
             slave_nodes.append(instance)
     return (master_nodes, slave_nodes)
 

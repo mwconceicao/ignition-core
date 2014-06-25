@@ -115,6 +115,7 @@ def launch(cluster_name, slaves, key_file, team, env=default_env,
            zone=default_zone, instance_type=default_instance_type,
            spot_price=default_spot_price,
            user_data = default_user_data,
+           security_group = None,
            master_instance_type=default_master_instance_type,
            wait_time='180', hadoop_major_version='2',
            worker_instances=default_worker_instances, retries_on_same_cluster=3,
@@ -130,6 +131,14 @@ def launch(cluster_name, slaves, key_file, team, env=default_env,
         log.info('Creating new cluster {0}, try {1}'.format(cluster_name, j+1))
         success = False
         resume_param = ['--resume'] if resume else []
+
+        auth_params = []
+        if security_group:
+            auth_params.extend([
+                '--authorized-address', '127.0.0.1/32',
+                '--additional-security-group', security_group
+            ])
+
         for i in range(retries_on_same_cluster):
             log.info('Running script, try %d of %d', i + 1, retries_on_same_cluster)
             try:
@@ -148,7 +157,9 @@ def launch(cluster_name, slaves, key_file, team, env=default_env,
                             '--master-opts', '-Dspark.worker.timeout={0}'.format(worker_timeout),
                             '-v', spark_version,
                             '--user-data', user_data,
-                            'launch', cluster_name] + resume_param)
+                            'launch', cluster_name] +
+                                resume_param +
+                                auth_params)
                 success = True
             except subprocess.CalledProcessError as e:
                 resume_param = ['--resume']
@@ -172,9 +183,13 @@ def launch(cluster_name, slaves, key_file, team, env=default_env,
     raise CommandError('Failed to created cluster {} after failures'.format(cluster_name))
 
 
-def destroy(cluster_name, region=default_region):
+def destroy(cluster_name, keep_groups=False, region=default_region):
+    delete_sg_param = [] if keep_groups else ['--delete-groups']
+
     ec2_script_path = chdir_to_ec2_script_and_get_path()
-    p = subprocess.Popen([ec2_script_path, 'destroy', cluster_name, '--region', region],
+    p = subprocess.Popen([ec2_script_path,
+                          'destroy', cluster_name,
+                          '--region', region] + delete_sg_param,
                          stdin=subprocess.PIPE,
                          stdout=sys.stdout, universal_newlines=True)
     p.communicate('y')
