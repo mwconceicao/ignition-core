@@ -37,7 +37,8 @@ default_worker_instances = '2'
 default_master_instance_type = 'c3.large'
 default_region = 'us-east-1'
 default_zone = default_region + 'b'
-default_key_id = 'mail_chaordic_key'
+default_key_id = 'ignition_key'
+default_key_file = os.path.expanduser('~/.ssh/ignition_key.pem')
 default_ami = 'ami-35b1885c'  # HVM AMI
 default_env = 'prod'
 default_spark_version = '1.0.0'
@@ -110,7 +111,8 @@ def cluster_exists(cluster_name):
         return False
 
 
-def launch(cluster_name, slaves, key_file, team, env=default_env,
+def launch(cluster_name, slaves, team,
+           key_file=default_key_file, env=default_env,
            key_id=default_key_id, region=default_region,
            zone=default_zone, instance_type=default_instance_type,
            spot_price=default_spot_price,
@@ -202,7 +204,7 @@ def get_master(cluster_name):
     return masters[0].public_dns_name
 
 
-def ssh_master(cluster_name, key_file, user='ec2-user', *args):
+def ssh_master(cluster_name, key_file=default_key_file, user='ec2-user', *args):
     master = get_master(cluster_name)
     ssh_call(user=user, host=master, key_file=key_file, args=args)
 
@@ -213,7 +215,8 @@ def ssh_master(cluster_name, key_file, user='ec2-user', *args):
 @arg('--detached', help='Run job in background, requires tmux')
 @arg('--destroy-cluster', help='Will destroy cluster after finishing the job')
 @named('run')
-def job_run(cluster_name, job_name, job_mem, key_file, disable_tmux=False,
+def job_run(cluster_name, job_name, job_mem,
+            key_file=default_key_file, disable_tmux=False,
             detached=False, notify_on_errors=False, yarn=False,
             job_user = getpass.getuser(),
             remote_user=default_remote_user, utc_job_date=None, job_tag=None,
@@ -275,7 +278,7 @@ def job_run(cluster_name, job_name, job_mem, key_file, disable_tmux=False,
     return (job_name, job_tag)
 
 @named('attach')
-def job_attach(cluster_name, key_file, job_name=None, job_tag=None,
+def job_attach(cluster_name, key_file=default_key_file, job_name=None, job_tag=None,
                master=None, remote_user=default_remote_user):
 
     master = master or get_master(cluster_name)
@@ -291,7 +294,7 @@ class JobFailure(Exception): pass
 
 
 @named('wait-for')
-def wait_for_job(cluster_name, job_name, job_tag, key_file,
+def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                  master=None, remote_user=default_remote_user,
                  remote_control_dir=default_remote_control_dir,
                  collect_results_dir=default_collect_results_dir,
@@ -353,7 +356,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file,
 
 
 @named('kill')
-def kill_job(cluster_name, job_name, job_tag, key_file,
+def kill_job(cluster_name, job_name, job_tag, key_file=default_key_file,
              master=None, remote_user=default_remote_user,
              remote_control_dir=default_remote_control_dir):
 
@@ -373,7 +376,7 @@ def kill_job(cluster_name, job_name, job_tag, key_file,
 
 
 @named('killall')
-def killall_jobs(cluster_name, key_file,
+def killall_jobs(cluster_name, key_file=default_key_file,
              master=None, remote_user=default_remote_user,
              remote_control_dir=default_remote_control_dir):
     master = master or get_master(cluster_name)
