@@ -48,7 +48,7 @@ default_collect_results_dir = '/tmp'
 default_user_data = os.path.join(script_path, 'scripts', 'S05mount-disks')
 
 master_post_create_commands = [
-'sudo', 'yum', '-y', 'install', 'tmux'
+    'sudo', 'yum', '-y', 'install', 'tmux'
 ]
 
 def logged_call_base(func, args, tries):
@@ -209,6 +209,16 @@ def ssh_master(cluster_name, key_file=default_key_file, user='ec2-user', *args):
     ssh_call(user=user, host=master, key_file=key_file, args=args)
 
 
+def rsync_call(user, host, key_file, args=[], src_local='', dest_local='', remote_path='', tries=3):
+    rsync_args = ['rsync', '--timeout', '60', '-azvP']
+    rsync_args += ['-e', 'ssh -i {} -o StrictHostKeyChecking=no'.format(key_file)]
+    rsync_args += args
+    rsync_args += [src_local] if src_local else []
+    rsync_args += ['{0}@{1}:{2}'.format(user, host, remote_path)]
+    rsync_args += [dest_local] if dest_local else []
+    return logged_call(rsync_args, tries=tries)
+
+
 @arg('job-mem', help='The amount of memory to use for this job (like: 80G)')
 @arg('--master', help="This parameter overrides the master of cluster-name")
 @arg('--disable-tmux', help='Do not use tmux. Warning: many features will not work without tmux. Use only if the tmux is missing on the master.')
@@ -248,14 +258,17 @@ def job_run(cluster_name, job_name, job_mem,
         job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, detached='-d' if detached else '', yarn_param=yarn_param, notify_param=notify_param, tmux_wait_command=tmux_wait_command)
     non_tmux_arg = ". /etc/profile; . ~/.profile;{remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param}".format(
         job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, yarn_param=yarn_param, notify_param=notify_param)
-    rsync_args = ['rsync', '--timeout', '60']
-    rsync_args += reduce(chain, (['--exclude', i]
-                for i in ('.git', 'target', 'tools',
+
+    rsync_args = reduce(chain, (['--exclude', i]
+                    for i in ('.git', 'target', 'tools',
                           '.idea', '.idea_modules', '.lib')))
-    rsync_args += ['--delete', '-azvP', project_path + '/',
-             '-e', 'ssh -i {} -o StrictHostKeyChecking=no'.format(key_file),
-             '{0}@{1}:{2}'.format(remote_user, master, remote_path)]
-    logged_call(rsync_args, tries=3)
+
+    rsync_call(user=remote_user,
+               host=master,
+               key_file=key_file,
+               args=rsync_args,
+               src_local=project_path + '/',
+               remote_path=remote_path)
 
     if disable_tmux:
         ssh_call(user=remote_user, host=master, key_file=key_file, args=[non_tmux_arg], allocate_terminal=False)
@@ -266,9 +279,9 @@ def job_run(cluster_name, job_name, job_mem,
         failed = False
         try:
             wait_for_job(cluster_name=cluster_name, job_name=job_name,
-                     job_tag=job_tag, key_file=key_file, master=master,
-                     remote_user=remote_user, remote_control_dir=remote_control_dir,
-                     collect_results_dir=collect_results_dir)
+                         job_tag=job_tag, key_file=key_file, master=master,
+                         remote_user=remote_user, remote_control_dir=remote_control_dir,
+                         collect_results_dir=collect_results_dir)
         except JobFailure as e:
             failed = True
             log.warn('Job failed with: {}'.format(e))
@@ -276,6 +289,7 @@ def job_run(cluster_name, job_name, job_mem,
             log.info('Destroying cluster as requested')
             destroy(cluster_name)
     return (job_name, job_tag)
+
 
 @named('attach')
 def job_attach(cluster_name, key_file=default_key_file, job_name=None, job_tag=None,
@@ -293,6 +307,37 @@ def job_attach(cluster_name, key_file=default_key_file, job_name=None, job_tag=N
 class JobFailure(Exception): pass
 
 
+def get_job_with_tag(job_name, job_tag):
+    return '{job_name}.{job_tag}'.format(job_name=job_name, job_tag=job_tag)
+
+
+def get_job_control_dir(remote_control_dir, job_with_tag):
+    return '{remote_control_dir}/{job_with_tag}'.format(remote_control_dir=remote_control_dir, job_with_tag=job_with_tag)
+
+
+def with_leading_slash(s):
+    return s if s.endswith('/') else s + '/'
+
+@named('collect-results')
+def collect_job_results(cluster_name, job_name, job_tag,
+                        key_file=default_key_file,
+                        master=None, remote_user=default_remote_user,
+                        remote_control_dir=default_remote_control_dir,
+                        collect_results_dir=default_collect_results_dir):
+    master = master or get_master(cluster_name)
+
+    job_with_tag = get_job_with_tag(job_name, job_tag)
+    job_control_dir = get_job_control_dir(remote_control_dir, job_with_tag)
+
+    rsync_call(user=remote_user,
+               host=master,
+               key_file=key_file,
+               dest_local=with_leading_slash(collect_results_dir),
+               remote_path=job_control_dir)
+
+    return os.path.join(collect_results_dir, os.path.basename(job_control_dir))
+
+
 @named('wait-for')
 def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                  master=None, remote_user=default_remote_user,
@@ -302,10 +347,12 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
 
     master = master or get_master(cluster_name)
 
-    job_with_tag = '{job_name}.{job_tag}'.format(job_name=job_name, job_tag=job_tag)
+    job_with_tag = get_job_with_tag(job_name, job_tag)
+
     log.info('Will wait remote status for job: {job_with_tag}'.format(job_with_tag=job_with_tag))
 
-    job_control_dir = '{remote_control_dir}/{job_with_tag}'.format(remote_control_dir=remote_control_dir, job_with_tag=job_with_tag)
+    job_control_dir = get_job_control_dir(remote_control_dir, job_with_tag)
+
     ssh_call_check_status = [
                 '''([ ! -e {path} ] && echo LOSTCONTROL) ||
                    ([ -e {path}/RUNNING ] && ps -p $(cat {path}/RUNNING) >& /dev/null && echo RUNNING) ||
@@ -313,6 +360,34 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                    ([ -e {path}/FAILURE ] && echo FAILURE) ||
                    echo KILLED'''.format(path=job_control_dir)
                 ]
+
+    def collect(show_tail):
+        try:
+            dest_log_dir = collect_job_results(cluster_name=cluster_name,
+                                            job_name=job_name, job_tag=job_tag,
+                                            key_file=key_file,
+                                            master=master, remote_user=remote_user,
+                                            remote_control_dir=remote_control_dir,
+                                            collect_results_dir=collect_results_dir)
+            log.info('Jobs results saved on: {}'.format(dest_log_dir))
+            if show_tail:
+                output_log = os.path.join(dest_log_dir, 'output.log')
+                output_failure = os.path.join(dest_log_dir, 'FAILURE')
+                try:
+                    if os.path.exists(output_failure):
+                        log.info('Tail of {}'.format(output_failure))
+                        print(check_output(['tail', output_failure]))
+                    if os.path.exists(output_log):
+                        log.info('Tail of {}'.format(output_log))
+                        print(check_output(['tail', output_log]))
+                    else:
+                        log.warn('Missing log file {}'.format(output_log))
+                except Exception as e:
+                    log.warn('Failed read log files: {}'.format(e))
+            return dest_log_dir
+        except Exception as e:
+            log.warn('Failed to collect job results: {}'.format(e))
+
     failures = 0
     last_failure = None
     start_time = time.time()
@@ -322,20 +397,23 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                                args=ssh_call_check_status, get_output=True) or '').strip()
             if output == 'SUCCESS':
                 log.info('Job finished successfully!')
-                break # TODO: Save remaining files, notify on errors
+                collect(show_tail=False)
+                break
             elif output == 'FAILURE':
                 log.error('Job failed...')
-                raise JobFailure('Job failed...') # TODO: Save remaining files, notify on errors
+                collect(show_tail=True)
+                raise JobFailure('Job failed...')
             elif output == 'LOSTCONTROL':
                 log.error('''No control directory found for the job. Possible explanations:
                           1) The given job name and tag are wrong
                           2) The given master server is wrong
                           3) Something is messing around with the server (rebooting it or deleting files)
                           4) The script has a bug (I really doubt ;)''')
-                raise JobFailure('Lost control...')# TODO: notify
+                raise JobFailure('Lost control...') # TODO: notify
             elif output == 'KILLED':
                 log.warn('Job has been killed before finishing')
-                break # TODO: decide what to do
+                collect(show_tail=True)
+                break
             elif output == 'RUNNING':
                 log.info('Job is running...')
             else:
@@ -348,8 +426,10 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
             last_failure = 'Exception: {}'.format(e)
         if failures > max_failures:
             log.error('Too many failures while checking job status, the last one was {}'.format(e))
+            collect(show_tail=True)
             raise JobFailure('Too many failures')
         if job_timeout_minutes > 0 and (time.time() - start_time) / 60 >= job_timeout_minutes:
+            collect(show_tail=True)
             raise JobFailure('Timed out')
         log.debug('Sleeping for {} seconds before checking new status'.format(seconds_to_sleep))
         time.sleep(seconds_to_sleep)
@@ -362,23 +442,21 @@ def kill_job(cluster_name, job_name, job_tag, key_file=default_key_file,
 
     master = master or get_master(cluster_name)
 
-    job_with_tag = '{job_name}.{job_tag}'.format(job_name=job_name, job_tag=job_tag)
-    job_control_dir = '{remote_control_dir}/{job_with_tag}'.format(remote_control_dir=remote_control_dir, job_with_tag=job_with_tag)
+    job_with_tag = get_job_with_tag(job_name, job_tag)
+    job_control_dir = get_job_control_dir(remote_control_dir, job_with_tag)
 
-    session_name = 'spark.{job_with_tag}'.format(job_with_tag=job_with_tag)
     ssh_call(user=remote_user, host=master, key_file=key_file,
         args=['''{
             pid=$(cat %s/RUNNING)
             children=$(pgrep -P $pid)
             sudo kill $pid $children
-        }''' % job_control_dir
-        ])
+        }''' % job_control_dir])
 
 
 @named('killall')
 def killall_jobs(cluster_name, key_file=default_key_file,
-             master=None, remote_user=default_remote_user,
-             remote_control_dir=default_remote_control_dir):
+                 master=None, remote_user=default_remote_user,
+                 remote_control_dir=default_remote_control_dir):
     master = master or get_master(cluster_name)
     ssh_call(user=remote_user, host=master, key_file=key_file,
             args=[
@@ -394,7 +472,8 @@ def killall_jobs(cluster_name, key_file=default_key_file,
 
 parser = ArghParser()
 parser.add_commands([launch, destroy, get_master, ssh_master])
-parser.add_commands([job_run, job_attach, wait_for_job, kill_job, killall_jobs], namespace="jobs")
+parser.add_commands([job_run, job_attach, wait_for_job,
+                     kill_job, killall_jobs, collect_job_results], namespace="jobs")
 
 if __name__ == '__main__':
     parser.dispatch()
