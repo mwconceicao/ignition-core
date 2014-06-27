@@ -376,10 +376,10 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                 try:
                     if os.path.exists(output_failure):
                         log.info('Tail of {}'.format(output_failure))
-                        print(check_output(['tail', output_failure]))
+                        print(check_output(['tail', '-n', '20', output_failure]))
                     if os.path.exists(output_log):
                         log.info('Tail of {}'.format(output_log))
-                        print(check_output(['tail', output_log]))
+                        print(check_output(['tail', '-n', '20', output_log]))
                     else:
                         log.warn('Missing log file {}'.format(output_log))
                 except Exception as e:
