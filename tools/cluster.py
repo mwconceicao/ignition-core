@@ -181,7 +181,7 @@ def launch(cluster_name, slaves, team,
             return get_master(cluster_name)
         else:
             log.warn('Destroying unsuccessful cluster')
-            destroy(cluster_name=cluster_name, region=region)
+            destroy(cluster_name=cluster_name, region=region, keep_groups=True)
     raise CommandError('Failed to created cluster {} after failures'.format(cluster_name))
 
 
