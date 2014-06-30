@@ -7,6 +7,7 @@ This line is to make pylint happy
 
 """
 
+import argh
 from argh import ArghParser, CommandError
 from argh.decorators import named, arg
 import subprocess
@@ -111,12 +112,16 @@ def cluster_exists(cluster_name):
         return False
 
 
-def launch(cluster_name, slaves, team,
-           key_file=default_key_file, env=default_env,
+@argh.arg('-t', '--tag', action='append', type=str,
+          help='Use multiple times, like: --tag tag1=value1 --tag tag2=value2')
+def launch(cluster_name, slaves,
+           key_file=default_key_file,
+           env=default_env,
+           tag=[],
            key_id=default_key_id, region=default_region,
            zone=default_zone, instance_type=default_instance_type,
            spot_price=default_spot_price,
-           user_data = default_user_data,
+           user_data=default_user_data,
            security_group = None,
            master_instance_type=default_master_instance_type,
            wait_time='180', hadoop_major_version='2',
@@ -128,6 +133,11 @@ def launch(cluster_name, slaves, team,
 
     if cluster_exists(cluster_name) and not resume:
         raise CommandError('Cluster already exists, pick another name or resume the setup using --resume')
+
+    final_tags = {'env':env, 'spark_cluster_name': cluster_name}
+    for t in tag:
+        k, v = t.split('=')
+        final_tags[k] = v
 
     for j in range(max_clusters_to_recreate):
         log.info('Creating new cluster {0}, try {1}'.format(cluster_name, j+1))
@@ -167,9 +177,10 @@ def launch(cluster_name, slaves, team,
                 resume_param = ['--resume']
                 log.warn('Failed with: %s', e)
             tag_instances(cluster_name, {'team': team,
-                                        'env': env,
-                                        'spark_cluster_name': cluster_name,
-                                        'name': cluster_name})
+                                         'env': env,
+                                         'chaordic:product': team,
+                                         'chaordic:role': 'ignition',
+                                         'spark_cluster_name': cluster_name})
 
             # TODO: use a more elaborate test here
             success = success and cluster_exists(cluster_name)
