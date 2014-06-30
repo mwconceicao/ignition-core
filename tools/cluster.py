@@ -176,11 +176,7 @@ def launch(cluster_name, slaves,
             except subprocess.CalledProcessError as e:
                 resume_param = ['--resume']
                 log.warn('Failed with: %s', e)
-            tag_instances(cluster_name, {'team': team,
-                                         'env': env,
-                                         'chaordic:product': team,
-                                         'chaordic:role': 'ignition',
-                                         'spark_cluster_name': cluster_name})
+            tag_instances(cluster_name, final_tags)
 
             # TODO: use a more elaborate test here
             success = success and cluster_exists(cluster_name)
