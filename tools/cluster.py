@@ -112,8 +112,31 @@ def cluster_exists(cluster_name):
         return False
 
 
+def parse_tags(tag_list):
+    """
+    >>> 'tag2' in parse_tags(['tag1=value1', 'tag2=value2'])
+    True
+    """
+    tags = {}
+    for t in tag_list:
+        k, v = t.split('=')
+        tags[k] = v
+    return tags
+
+tag_help_text = 'Use multiple times, like: --tag tag1=value1 --tag tag2=value'
+
+
 @argh.arg('-t', '--tag', action='append', type=str,
-          help='Use multiple times, like: --tag tag1=value1 --tag tag2=value2')
+          help=tag_help_text)
+@named('tag-instances')
+def tag_cluster_instances(cluster_name, tag=[], env=default_env):
+    tags = {'env': env, 'spark_cluster_name': cluster_name}
+    tags.update(parse_tags(tag))
+    tag_instances(cluster_name, tags)
+
+
+@argh.arg('-t', '--tag', action='append', type=str,
+          help=tag_help_text)
 def launch(cluster_name, slaves,
            key_file=default_key_file,
            env=default_env,
@@ -134,11 +157,6 @@ def launch(cluster_name, slaves,
     if cluster_exists(cluster_name) and not resume:
         raise CommandError('Cluster already exists, pick another name or resume the setup using --resume')
 
-    final_tags = {'env':env, 'spark_cluster_name': cluster_name}
-    for t in tag:
-        k, v = t.split('=')
-        final_tags[k] = v
-
     for j in range(max_clusters_to_recreate):
         log.info('Creating new cluster {0}, try {1}'.format(cluster_name, j+1))
         success = False
@@ -155,28 +173,28 @@ def launch(cluster_name, slaves,
             log.info('Running script, try %d of %d', i + 1, retries_on_same_cluster)
             try:
                 call_ec2_script(['--ami', ami,
-                            '--identity-file', key_file,
-                            '--key-pair', key_id,
-                            '--slaves', slaves,
-                            '--spot-price', spot_price,
-                            '--region', region,
-                            '--zone', zone,
-                            '--instance-type', instance_type,
-                            '--master-instance-type', master_instance_type,
-                            '--wait', wait_time,
-                            '--hadoop-major-version', hadoop_major_version,
-                            '--worker-instances', worker_instances,
-                            '--master-opts', '-Dspark.worker.timeout={0}'.format(worker_timeout),
-                            '-v', spark_version,
-                            '--user-data', user_data,
-                            'launch', cluster_name] +
-                                resume_param +
-                                auth_params)
+                                 '--identity-file', key_file,
+                                 '--key-pair', key_id,
+                                 '--slaves', slaves,
+                                 '--spot-price', spot_price,
+                                 '--region', region,
+                                 '--zone', zone,
+                                 '--instance-type', instance_type,
+                                 '--master-instance-type', master_instance_type,
+                                 '--wait', wait_time,
+                                 '--hadoop-major-version', hadoop_major_version,
+                                 '--worker-instances', worker_instances,
+                                 '--master-opts', '-Dspark.worker.timeout={0}'.format(worker_timeout),
+                                 '-v', spark_version,
+                                 '--user-data', user_data,
+                                 'launch', cluster_name] +
+                                     resume_param +
+                                     auth_params)
                 success = True
             except subprocess.CalledProcessError as e:
                 resume_param = ['--resume']
                 log.warn('Failed with: %s', e)
-            tag_instances(cluster_name, final_tags)
+            tag_cluster_instances(cluster_name=cluster_name, tag=tag, env=env)
 
             # TODO: use a more elaborate test here
             success = success and cluster_exists(cluster_name)
@@ -478,7 +496,7 @@ def killall_jobs(cluster_name, key_file=default_key_file,
 
 
 parser = ArghParser()
-parser.add_commands([launch, destroy, get_master, ssh_master])
+parser.add_commands([launch, destroy, get_master, ssh_master, tag_cluster_instances])
 parser.add_commands([job_run, job_attach, wait_for_job,
                      kill_job, killall_jobs, collect_job_results], namespace="jobs")
 
