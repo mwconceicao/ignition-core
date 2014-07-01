@@ -82,7 +82,7 @@ def logged_call(args, tries=1):
 def ssh_call(user, host, key_file, args=(), allocate_terminal=True, get_output=False):
     base = ['ssh', '-q']
     if allocate_terminal:
-        base += ['-t']
+        base += ['-tt']
     base += ['-i', key_file,
              '-o', 'StrictHostKeyChecking=no',
              '{0}@{1}'.format(user, host)]
