@@ -284,10 +284,11 @@ def job_run(cluster_name, job_name, job_mem,
     non_tmux_arg = ". /etc/profile; . ~/.profile;{remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param}".format(
         job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, yarn_param=yarn_param, notify_param=notify_param)
 
-    rsync_args = reduce(chain, (['--exclude', i]
+    rsync_args = list(reduce(chain, (['--exclude', i]
                     for i in ('.git', 'target', 'tools',
-                          '.idea', '.idea_modules', '.lib')))
+                          '.idea', '.idea_modules', '.lib'))))
 
+    rsync_args += ['--delete']
     rsync_call(user=remote_user,
                host=master,
                key_file=key_file,
