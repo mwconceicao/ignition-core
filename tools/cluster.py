@@ -20,6 +20,7 @@ from datetime import datetime
 import time
 import logging
 import getpass
+import json
 
 
 log = logging.getLogger()
@@ -47,10 +48,30 @@ default_remote_user = 'ec2-user'
 default_remote_control_dir = '/tmp/Ignition'
 default_collect_results_dir = '/tmp'
 default_user_data = os.path.join(script_path, 'scripts', 'S05mount-disks')
+default_defaults_filename = 'cluster_defaults.json'
+
 
 master_post_create_commands = [
     'sudo', 'yum', '-y', 'install', 'tmux'
 ]
+
+
+def get_defaults(directory=None, defaults_filename=default_defaults_filename):
+    directory = os.path.normpath(directory or get_module_path())
+
+    defaults_file = os.path.join(directory, defaults_filename)
+    if os.path.exists(defaults_file):
+        with open(defaults_file) as f:
+            # return the configuration as dictionary-like
+            return json.load(f)
+
+    parent_directory = os.path.normpath(os.path.join(directory, '..'))
+    if parent_directory != directory:
+        return get_defaults(directory=parent_directory, defaults_filename=defaults_filename)
+    else:
+        # we are stuck and no file found, return blank defaults
+        return {}
+
 
 def logged_call_base(func, args, tries):
     for i in range(tries - 1):
@@ -66,9 +87,9 @@ def logged_call_base(func, args, tries):
 def get_module_path():
     return os.path.realpath(os.path.join(script_path, '..'))
 
+
 def get_project_path():
     return os.path.realpath(os.path.join(get_module_path(), '..'))
-
 
 
 def logged_call_output(args, tries=1):
@@ -91,6 +112,7 @@ def ssh_call(user, host, key_file, args=(), allocate_terminal=True, get_output=F
         return logged_call_output(base)
     else:
         return logged_call(base)
+
 
 def chdir_to_ec2_script_and_get_path():
     ec2_script_base = os.path.join(script_path, 'spark-ec2')
@@ -123,6 +145,7 @@ def parse_tags(tag_list):
         tags[k] = v
     return tags
 
+
 tag_help_text = 'Use multiple times, like: --tag tag1=value1 --tag tag2=value'
 
 
@@ -131,6 +154,7 @@ tag_help_text = 'Use multiple times, like: --tag tag1=value1 --tag tag2=value'
 @named('tag-instances')
 def tag_cluster_instances(cluster_name, tag=[], env=default_env):
     tags = {'env': env, 'spark_cluster_name': cluster_name}
+    tags.update(get_defaults().get('tags', {}))
     tags.update(parse_tags(tag))
     tag_instances(cluster_name, tags)
 
