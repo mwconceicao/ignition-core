@@ -13,7 +13,8 @@ object CoreJobRunner {
                           date: DateTime = DateTime.now,
                           tag: String = "notag",
                           user: String = "nouser",
-                          master: String = "local[*]")
+                          master: String = "local[*]",
+                          additionalArgs: Map[String, String] = Map.empty)
 
   def runJobSetup(args: Array[String], jobsSetups: Map[String, (RunnerContext) => Unit]) {
     val parser = new scopt.OptionParser[RunnerConfig]("Runner") {
@@ -32,6 +33,10 @@ object CoreJobRunner {
       }
       opt[String]('m', "master") action { (x, c) =>
         c.copy(master = x)
+      }
+
+      opt[(String, String)]('w', "with") unbounded() action { (x, c) =>
+        c.copy(additionalArgs = c.additionalArgs ++ Map(x))
       }
     }
 

@@ -28,7 +28,7 @@ libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "0.8.0"
 
 libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.0" % "test"
 
-libraryDependencies += "org.scalaj" %% "scalaj-http" % "0.3.14"
+libraryDependencies += "org.scalaj" %% "scalaj-http" % "0.3.16"
 
 libraryDependencies += "com.github.scopt" %% "scopt" % "3.2.0"
 
