@@ -30,6 +30,8 @@ libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.0" % "test"
 
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "0.3.16"
 
+libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.6"
+
 libraryDependencies += "com.github.scopt" %% "scopt" % "3.2.0"
 
 

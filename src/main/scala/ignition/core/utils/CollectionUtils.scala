@@ -3,6 +3,10 @@ import scala.collection.IterableLike
 import scala.collection.generic.CanBuildFrom
 import scala.language.implicitConversions
 
+//TODO: import only what is used
+import scalaz._
+import Scalaz._
+
 object CollectionUtils {
 
   //TODO: review this code
@@ -24,4 +28,15 @@ object CollectionUtils {
   }
 
   implicit def toRich[A, Repr](xs: IterableLike[A, Repr]) = new RichCollection(xs)
+
+  implicit class ValidatedCollection[A, B](seq: Seq[Validation[A, B]]) {
+
+    def mapSuccess(f: B => Validation[A, B]): Seq[Validation[A, B]] = {
+      seq.map({
+        case Success(v) => f(v)
+        case failure => failure
+      })
+    }
+
+  }
 }
