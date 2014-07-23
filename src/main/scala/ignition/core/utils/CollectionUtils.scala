@@ -37,6 +37,11 @@ object CollectionUtils {
         case failure => failure
       })
     }
+  }
 
+  implicit class OptionCollection(opt: Option[String]) {
+    def isBlank: Boolean = {
+      opt.isEmpty || opt.get.trim.isEmpty
+    }
   }
 }
