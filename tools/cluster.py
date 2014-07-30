@@ -338,6 +338,8 @@ def job_run(cluster_name, job_name, job_mem,
         if destroy_cluster:
             log.info('Destroying cluster as requested')
             destroy(cluster_name)
+        if failed:
+            sys.exit(1)
     return (job_name, job_tag)
 
 
