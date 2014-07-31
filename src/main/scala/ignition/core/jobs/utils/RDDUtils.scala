@@ -8,6 +8,8 @@ import org.apache.spark
 import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
 
+import scalaz.{Success, Validation}
+
 object RDDUtils {
   //TODO: try to make it work for any collection
   implicit class OptionRDDImprovements[V: ClassTag](rdd: RDD[Option[V]]) {
@@ -19,6 +21,26 @@ object RDDUtils {
   implicit class SeqRDDImprovements[V: ClassTag](rdd: RDD[Seq[V]]) {
     def flatten: RDD[V] = {
       rdd.flatMap(x => x)
+    }
+  }
+
+  implicit class ValidatedRDDImprovements[A: ClassTag, B: ClassTag](rdd: RDD[Validation[A, B]]) {
+
+    def mapSuccess(f: B => Validation[A, B]): RDD[Validation[A, B]] = {
+      rdd.map({
+        case Success(v) => f(v)
+        case failure => failure
+      })
+    }
+  }
+
+  implicit class ValidatedPairRDDImprovements[A: ClassTag, B: ClassTag, K: ClassTag](rdd: RDD[(K, Validation[A, B])]) {
+
+    def mapValuesSuccess(f: B => Validation[A, B]): RDD[(K, Validation[A, B])] = {
+      rdd.mapValues({
+        case Success(v) => f(v)
+        case failure => failure
+      })
     }
   }
 
