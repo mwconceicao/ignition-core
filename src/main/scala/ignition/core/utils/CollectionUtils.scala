@@ -64,4 +64,9 @@ object CollectionUtils {
       opt.isEmpty || opt.get.trim.isEmpty
     }
   }
+
+  // Useful to be called from java code
+  def mutableMapToImmutable[K, V](map: scala.collection.mutable.Map[K, V]): Map[K, V] = {
+    map.toMap
+  }
 }
