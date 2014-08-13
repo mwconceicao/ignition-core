@@ -31,10 +31,9 @@ object SparkContextUtils {
       paths.flatMap(getStatus(_)).map(_.getPath.toString).distinct.sorted
     }
 
-    // This method's purpose is to skip empty text files on a given path (to work around the fact that empty files gives errors to hadoop)
+    // This method's purpose is to skip empty files on a given path (to work around the fact that empty files gives errors to hadoop)
     // if the path expands only to files, it will just filter out the empty ones
     // if it expand to a directory, then it will get all non empty files from this directory (but will ignore subdirectories)
-
     def nonEmptyFilesPath(path: String): String = {
       // getStatus only get non empty files
       val status = getStatus(path)
