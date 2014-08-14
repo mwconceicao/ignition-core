@@ -25,17 +25,7 @@ notify_error_and_exit() {
     echo "${description}" > "${JOB_CONTROL_DIR}/FAILURE"
     # Do not notify if NOTIFY_ON_ERRORS is different from yes
     [[ "${NOTIFY_ON_ERRORS}" != 'yes' ]] && exit 1
-    json=$(cat <<EOF
-{
-    "service_key": "ec4d93adb6104570a1fbd72c9f84590e",
-    "incident_key": "spark_job",
-    "event_type": "trigger",
-    "description": "${description}"
-}
-EOF
-)
-    curl -H "Content-type: application/json" -X POST \
-    -d "${json}" https://events.pagerduty.com/generic/2010-04-15/create_event.json
+    # TODO: create some generic method to notify on errors
     exit 1
 }
 
@@ -55,10 +45,6 @@ on_trap_exit() {
 
 
 trap "on_trap_exit" EXIT
-
-# Default values, may be overriden
-export AWS_ACCESS_KEY_ID=AKIAJTLES4E4K4PJY5HA
-export AWS_SECRET_ACCESS_KEY=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
 
 SPARK_HOME=$(get_first_present /root/spark /opt/spark ~/spark*/)
 source "${SPARK_HOME}/conf/spark-env.sh"
