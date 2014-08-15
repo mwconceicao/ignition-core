@@ -58,7 +58,7 @@ object SparkContextUtils {
       if (paths.size < lastN) {
         throw new Exception(s"Tried to get last $lastN files/dirs of path $path, but the resulting number of paths $paths is less than the required")
       } else {
-        sc.nonEmptyTextFile(paths.mkString(","))
+        sc.nonEmptyTextFile(paths.takeRight(lastN).mkString(","))
       }
     }
 
@@ -73,7 +73,7 @@ object SparkContextUtils {
       if (paths.size < lastN) {
         throw new Exception(s"Tried to get last $lastN files/dirs of path $path, but the resulting number of paths $paths is less than the required")
       } else {
-        sc.stringHadoopFile(paths.mkString(","))
+        sc.stringHadoopFile(paths.takeRight(lastN).mkString(","))
       }
     }
   }
