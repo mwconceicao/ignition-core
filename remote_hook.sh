@@ -54,7 +54,7 @@ MAIN_CLASS="ignition.jobs.Runner"
 basic_job_opts="-Dspark.logConf=true -Dspark.default.parallelism=640 -Dspark.akka.frameSize=15 -verbose:gc -XX:-PrintGCDetails -XX:+PrintGCTimeStamps -Dspark.speculation=true"
 #kryo_opts="-Dspark.serializer=org.apache.spark.serializer.KryoSerializer -Dspark.kryoserializer.buffer.mb=20"
 compress_opts="-Dspark.hadoop.mapreduce.output.fileoutputformat.compress=true -Dspark.hadoop.mapreduce.output.fileoutputformat.compress.codec=org.apache.hadoop.io.compress.GzipCodec -Dspark.hadoop.mapreduce.output.fileoutputformat.compress.type=BLOCK"
-low_memory_opts="-Dspark.shuffle.memoryFraction=0.3 -Dspark.storage.memoryFraction=0.1 -Dspark.reducer.maxMbInFlight=10 -XX:-UseGCOverheadLimit"
+low_memory_opts="-Dspark.shuffle.memoryFraction=0.3 -Dspark.storage.memoryFraction=0.3 -Dspark.reducer.maxMbInFlight=10 -XX:-UseGCOverheadLimit"
 #cores_option="-Dspark.cores.max=320"
 
 job_opts="$basic_job_opts $low_memory_opts $compress_opts $kryo_opts $cores_option"
