@@ -2,10 +2,7 @@ package ignition.core.utils
 import scala.collection.IterableLike
 import scala.collection.generic.CanBuildFrom
 import scala.language.implicitConversions
-
-//TODO: import only what is used
 import scalaz._
-import Scalaz._
 
 object CollectionUtils {
 
@@ -63,6 +60,10 @@ object CollectionUtils {
     def isBlank: Boolean = {
       opt.isEmpty || opt.get.trim.isEmpty
     }
+    def noneIfBlank: Option[String] = {
+      if (opt.isBlank) None else opt
+    }
+
   }
 
   // Useful to be called from java code
