@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import logging
-import boto
+import boto.ec2
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,14 +22,21 @@ def parse_nodes(active_instances, cluster_name):
             slave_nodes.append(instance)
     return (master_nodes, slave_nodes)
 
-def get_masters(cluster_name):
-    conn = boto.connect_ec2()
+def get_masters(cluster_name, region):
+    conn = boto.ec2.connect_to_region(region)
+
     active = get_active_instances(conn)
     master_nodes, slave_nodes = parse_nodes(active, cluster_name)
     return master_nodes
 
-def tag_instances(cluster_name, tags):
-    conn = boto.connect_ec2()
+def get_active_nodes(cluster_name, region):
+    conn = boto.ec2.connect_to_region(region)
+    active = get_active_instances(conn)
+    return parse_nodes(active, cluster_name)
+
+
+def tag_instances(cluster_name, tags, region):
+    conn = boto.ec2.connect_to_region(region)
 
     active = get_active_instances(conn)
     logging.info('%d active instances', len(active))

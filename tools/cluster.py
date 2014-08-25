@@ -13,7 +13,7 @@ from argh.decorators import named, arg
 import subprocess
 from subprocess import check_output, check_call
 from itertools import chain
-from utils import tag_instances, get_masters
+from utils import tag_instances, get_masters, get_active_nodes
 import os
 import sys
 from datetime import datetime
@@ -26,7 +26,7 @@ import json
 log = logging.getLogger()
 log.setLevel(logging.INFO)
 #log.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('cluster - %(asctime)s - %(levelname)s - %(message)s')
 handler = log.handlers[0]
 handler.setFormatter(formatter)
 log.addHandler(handler)
@@ -83,7 +83,7 @@ def logged_call_base(func, args, tries):
         try:
             return func(args)
         except Exception as e:
-            log.warn('Got exception {0}, retrying...'.format(e))
+            log.exception('Got exception, retrying...')
     log.debug('Calling: %s', args)
     return func(args)
 
@@ -130,9 +130,9 @@ def call_ec2_script(args):
     return logged_call([ec2_script_path] + args)
 
 
-def cluster_exists(cluster_name):
+def cluster_exists(cluster_name, region):
     try:
-        get_master(cluster_name)
+        get_master(cluster_name, region=region)
         return True
     except Exception as e:
         return False
@@ -149,6 +149,13 @@ def parse_tags(tag_list):
         tags[k] = v
     return tags
 
+def save_cluster_args(master, key_file, remote_user, all_args):
+    ssh_call(user=remote_user, host=master, key_file=key_file,
+             args=["echo '{}' > /tmp/cluster_args.json".format(json.dumps(all_args))])
+
+def load_cluster_args(master, key_file, remote_user):
+    return json.loads(ssh_call(user=remote_user, host=master, key_file=key_file, args=["cat", "/tmp/cluster_args.json"], get_output=True))
+
 
 tag_help_text = 'Use multiple times, like: --tag tag1=value1 --tag tag2=value'
 
@@ -156,11 +163,11 @@ tag_help_text = 'Use multiple times, like: --tag tag1=value1 --tag tag2=value'
 @argh.arg('-t', '--tag', action='append', type=str,
           help=tag_help_text)
 @named('tag-instances')
-def tag_cluster_instances(cluster_name, tag=[], env=default_env):
+def tag_cluster_instances(cluster_name, tag=[], env=default_env, region=default_region):
     tags = {'env': env, 'spark_cluster_name': cluster_name}
     tags.update(get_defaults().get('tags', {}))
     tags.update(parse_tags(tag))
-    tag_instances(cluster_name, tags)
+    tag_instances(cluster_name, tags, region=region)
 
 
 @argh.arg('-t', '--tag', action='append', type=str,
@@ -177,15 +184,22 @@ def launch(cluster_name, slaves,
            master_instance_type=default_master_instance_type,
            wait_time='180', hadoop_major_version='2',
            worker_instances=default_worker_instances, retries_on_same_cluster=5,
-           max_clusters_to_recreate=5,
+           max_clusters_to_create=5,
+           minimum_percentage_healthy_slaves=0.9,
            remote_user=default_remote_user,
-           resume=False, worker_timeout=240,
+           resume=False, just_ignore_existing=False, worker_timeout=240,
            spark_version=default_spark_version, ami=default_ami):
 
-    if cluster_exists(cluster_name) and not resume:
-        raise CommandError('Cluster already exists, pick another name or resume the setup using --resume')
+    all_args = locals()
 
-    for j in range(max_clusters_to_recreate):
+    if cluster_exists(cluster_name, region=region) and not resume:
+        if just_ignore_existing:
+            log.info('Cluster exists but that is ok')
+            return ''
+        else:
+            raise CommandError('Cluster already exists, pick another name or resume the setup using --resume')
+
+    for j in range(max_clusters_to_create):
         log.info('Creating new cluster {0}, try {1}'.format(cluster_name, j+1))
         success = False
         resume_param = ['--resume'] if resume else []
@@ -222,24 +236,27 @@ def launch(cluster_name, slaves,
             except subprocess.CalledProcessError as e:
                 resume_param = ['--resume']
                 log.warn('Failed with: %s', e)
-            tag_cluster_instances(cluster_name=cluster_name, tag=tag, env=env)
+            tag_cluster_instances(cluster_name=cluster_name, tag=tag, env=env, region=region)
 
-            # TODO: use a more elaborate test here
-            success = success and cluster_exists(cluster_name)
             if success:
                 break
 
-        if success:
-            ssh_master(cluster_name, key_file, remote_user, *master_post_create_commands)
-            return get_master(cluster_name)
-        else:
-            log.warn('Destroying unsuccessful cluster')
-            destroy(cluster_name=cluster_name, region=region, keep_groups=True)
+        try:
+            if success:
+                master = get_master(cluster_name, region=region)
+                save_cluster_args(master, key_file, remote_user, all_args)
+                health_check(cluster_name=cluster_name, key_file=key_file, master=master, remote_user=remote_user, region=region)
+                ssh_call(user=remote_user, host=master, key_file=key_file, args=master_post_create_commands)
+                return master
+        except Exception as e:
+            log.exception('Got exception on last steps of cluster configuration')
+        log.warn('Destroying unsuccessful cluster')
+        destroy(cluster_name=cluster_name, region=region)
     raise CommandError('Failed to created cluster {} after failures'.format(cluster_name))
 
 
-def destroy(cluster_name, keep_groups=False, region=default_region):
-    delete_sg_param = [] if keep_groups else ['--delete-groups']
+def destroy(cluster_name, delete_groups=False, region=default_region):
+    delete_sg_param = ['--delete-groups'] if delete_groups else []
 
     ec2_script_path = chdir_to_ec2_script_and_get_path()
     p = subprocess.Popen([ec2_script_path,
@@ -250,15 +267,15 @@ def destroy(cluster_name, keep_groups=False, region=default_region):
     p.communicate('y')
 
 
-def get_master(cluster_name):
-    masters = get_masters(cluster_name)
+def get_master(cluster_name, region=default_region):
+    masters = get_masters(cluster_name, region=region)
     if not masters:
         raise CommandError("No master on {}".format(cluster_name))
     return masters[0].public_dns_name
 
 
-def ssh_master(cluster_name, key_file=default_key_file, user='ec2-user', *args):
-    master = get_master(cluster_name)
+def ssh_master(cluster_name, key_file=default_key_file, user=default_remote_user, region=default_region, *args):
+    master = get_master(cluster_name, region=region)
     ssh_call(user=user, host=master, key_file=key_file, args=args)
 
 
@@ -282,18 +299,20 @@ def job_run(cluster_name, job_name, job_mem,
             key_file=default_key_file, disable_tmux=False,
             detached=False, notify_on_errors=False, yarn=False,
             job_user = getpass.getuser(),
+            job_timeout_minutes=0,
             remote_user=default_remote_user, utc_job_date=None, job_tag=None,
             disable_wait_completion=False, collect_results_dir=default_collect_results_dir,
             remote_control_dir = default_remote_control_dir,
             remote_path=None, master=None,
-            destroy_cluster=False):
+            kill_on_failure=False,
+            destroy_cluster=False, region=default_region):
 
     utc_job_date_example = '2014-05-04T13:13:10Z'
     if utc_job_date and len(utc_job_date) != len(utc_job_date_example):
         raise CommandError('UTC Job Date should be given as in the following example: {}'.format(utc_job_date_example))
     disable_tmux = disable_tmux and not detached
     wait_completion = not disable_wait_completion or destroy_cluster
-    master = master or get_master(cluster_name)
+    master = master or get_master(cluster_name, region=region)
 
     project_path = get_project_path()
     project_name = os.path.basename(project_path)
@@ -331,33 +350,67 @@ def job_run(cluster_name, job_name, job_mem,
 
     if wait_completion:
         failed = False
+        failed_exception = None
         try:
             wait_for_job(cluster_name=cluster_name, job_name=job_name,
                          job_tag=job_tag, key_file=key_file, master=master,
+                         job_timeout_minutes=job_timeout_minutes,
                          remote_user=remote_user, remote_control_dir=remote_control_dir,
                          collect_results_dir=collect_results_dir)
         except JobFailure as e:
             failed = True
+            failed_exception = e
             log.warn('Job failed with: {}'.format(e))
+        except NotHealthyCluster as e:
+            failed = True
+            failed_exception = e
+            log.warn('Job is running but cluster is unhealthy: {}'.format(e))
+        except Exception as e:
+            failed = True
+            failed_exception = e
+            log.exception('Unexpected exception while waiting for job')
+        if failed and kill_on_failure:
+            log.info('Trying to kill failed job...')
+            try:
+                kill_job(cluster_name=cluster_name, job_name=job_name,
+                        job_tag=job_tag, key_file=key_file,
+                        master=master, remote_user=remote_user,
+                        region=region,
+                        remote_control_dir=remote_control_dir)
+                log.info('Killed!')
+            except:
+                log.exception('Failed to kill failed job')
         if destroy_cluster:
             log.info('Destroying cluster as requested')
             destroy(cluster_name)
         if failed:
-            sys.exit(1)
+            raise failed_exception or Exception('Failed!?')
     return (job_name, job_tag)
 
 
 @named('attach')
 def job_attach(cluster_name, key_file=default_key_file, job_name=None, job_tag=None,
-               master=None, remote_user=default_remote_user):
+               master=None, remote_user=default_remote_user, region=default_region):
 
-    master = master or get_master(cluster_name)
+    master = master or get_master(cluster_name, region=region)
 
     args = ['tmux', 'attach']
     if job_name and job_tag:
         args += ['-t', 'spark.{0}.{1}'.format(job_name, job_tag)]
 
     ssh_call(user=remote_user, host=master, key_file=key_file, args=args)
+
+class NotHealthyCluster(Exception): pass
+
+@named('health-check')
+def health_check(cluster_name, key_file=default_key_file, master=None, remote_user=default_remote_user, region=default_region):
+    master = master or get_master(cluster_name, region=region)
+    all_args = load_cluster_args(master, key_file, remote_user)
+    nslaves = int(all_args['slaves'])
+    minimum_percentage_healthy_slaves = all_args['minimum_percentage_healthy_slaves']
+    masters, slaves = get_active_nodes(cluster_name, region=region)
+    if nslaves == 0 or float(len(slaves)) / nslaves < minimum_percentage_healthy_slaves:
+        raise NotHealthyCluster('Not enough healthy slaves: {0}/{1}'.format(len(slaves), nslaves))
 
 
 class JobFailure(Exception): pass
@@ -377,10 +430,11 @@ def with_leading_slash(s):
 @named('collect-results')
 def collect_job_results(cluster_name, job_name, job_tag,
                         key_file=default_key_file,
+                        region=default_region,
                         master=None, remote_user=default_remote_user,
                         remote_control_dir=default_remote_control_dir,
                         collect_results_dir=default_collect_results_dir):
-    master = master or get_master(cluster_name)
+    master = master or get_master(cluster_name, region=region)
 
     job_with_tag = get_job_with_tag(job_name, job_tag)
     job_control_dir = get_job_control_dir(remote_control_dir, job_with_tag)
@@ -397,11 +451,12 @@ def collect_job_results(cluster_name, job_name, job_tag,
 @named('wait-for')
 def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                  master=None, remote_user=default_remote_user,
+                 region=default_region,
                  remote_control_dir=default_remote_control_dir,
                  collect_results_dir=default_collect_results_dir,
                  job_timeout_minutes=0, max_failures=10, seconds_to_sleep=60):
 
-    master = master or get_master(cluster_name)
+    master = master or get_master(cluster_name, region=region)
 
     job_with_tag = get_job_with_tag(job_name, job_tag)
 
@@ -439,10 +494,10 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                     else:
                         log.warn('Missing log file {}'.format(output_log))
                 except Exception as e:
-                    log.warn('Failed read log files: {}'.format(e))
+                    log.exception('Failed read log files')
             return dest_log_dir
         except Exception as e:
-            log.warn('Failed to collect job results: {}'.format(e))
+            log.exception('Failed to collect job results')
 
     failures = 0
     last_failure = None
@@ -478,7 +533,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                 last_failure = 'Unexpected response: {}'.format(output)
         except subprocess.CalledProcessError as e:
             failures += 1
-            log.warn('Got exception> {}'.format(e))
+            log.exception('Got exception')
             last_failure = 'Exception: {}'.format(e)
         if failures > max_failures:
             log.error('Too many failures while checking job status, the last one was {}'.format(e))
@@ -487,6 +542,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
         if job_timeout_minutes > 0 and (time.time() - start_time) / 60 >= job_timeout_minutes:
             collect(show_tail=True)
             raise JobFailure('Timed out')
+        health_check(cluster_name=cluster_name, key_file=key_file, master=master, remote_user=remote_user)
         log.debug('Sleeping for {} seconds before checking new status'.format(seconds_to_sleep))
         time.sleep(seconds_to_sleep)
 
@@ -494,9 +550,10 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
 @named('kill')
 def kill_job(cluster_name, job_name, job_tag, key_file=default_key_file,
              master=None, remote_user=default_remote_user,
+             region=default_region,
              remote_control_dir=default_remote_control_dir):
 
-    master = master or get_master(cluster_name)
+    master = master or get_master(cluster_name, region=region)
 
     job_with_tag = get_job_with_tag(job_name, job_tag)
     job_control_dir = get_job_control_dir(remote_control_dir, job_with_tag)
@@ -512,8 +569,9 @@ def kill_job(cluster_name, job_name, job_tag, key_file=default_key_file,
 @named('killall')
 def killall_jobs(cluster_name, key_file=default_key_file,
                  master=None, remote_user=default_remote_user,
+                 region=default_region,
                  remote_control_dir=default_remote_control_dir):
-    master = master or get_master(cluster_name)
+    master = master or get_master(cluster_name, region=region)
     ssh_call(user=remote_user, host=master, key_file=key_file,
             args=[
             '''for i in {remote_control_dir}/*/RUNNING; do
@@ -527,7 +585,7 @@ def killall_jobs(cluster_name, key_file=default_key_file,
 
 
 parser = ArghParser()
-parser.add_commands([launch, destroy, get_master, ssh_master, tag_cluster_instances])
+parser.add_commands([launch, destroy, get_master, ssh_master, tag_cluster_instances, health_check])
 parser.add_commands([job_run, job_attach, wait_for_job,
                      kill_job, killall_jobs, collect_job_results], namespace="jobs")
 
