@@ -21,6 +21,7 @@ import time
 import logging
 import getpass
 import json
+import glob
 
 
 log = logging.getLogger()
@@ -288,6 +289,8 @@ def rsync_call(user, host, key_file, args=[], src_local='', dest_local='', remot
     rsync_args += [dest_local] if dest_local else []
     return logged_call(rsync_args, tries=tries)
 
+def build_assembly():
+    logged_call(['/bin/bash', '-c', '(cd {} && ./sbt assembly)'.format(get_project_path())])
 
 @arg('job-mem', help='The amount of memory to use for this job (like: 80G)')
 @arg('--master', help="This parameter overrides the master of cluster-name")
@@ -304,6 +307,8 @@ def job_run(cluster_name, job_name, job_mem,
             disable_wait_completion=False, collect_results_dir=default_collect_results_dir,
             remote_control_dir = default_remote_control_dir,
             remote_path=None, master=None,
+            disable_assembly_build=False,
+            run_tests=False,
             kill_on_failure=False,
             destroy_cluster=False, region=default_region):
 
@@ -319,8 +324,8 @@ def job_run(cluster_name, job_name, job_mem,
     module_name = os.path.basename(get_module_path())
     # Use job user on remote path to avoid too many conflicts for different local users
     remote_path = remote_path or '/home/%s/%s.%s' % (default_remote_user, job_user, project_name)
-    remote_app_path = remote_path
-    remote_hook = '{remote_app_path}/{module_name}/remote_hook.sh'.format(remote_app_path=remote_app_path, module_name=module_name)
+    remote_hook_local = '{module_path}/remote_hook.sh'.format(module_path=get_module_path())
+    remote_hook = '{remote_path}/remote_hook.sh'.format(remote_path=remote_path)
     notify_param = 'yes' if notify_on_errors else 'no'
     yarn_param = 'yes' if yarn else 'no'
     job_date = utc_job_date or datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -331,17 +336,27 @@ def job_run(cluster_name, job_name, job_mem,
     non_tmux_arg = ". /etc/profile; . ~/.profile;{aws_vars} {remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param}".format(
         aws_vars=get_aws_keys_str(), job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, yarn_param=yarn_param, notify_param=notify_param)
 
-    rsync_args = list(reduce(chain, (['--exclude', i]
-                    for i in ('.git', 'target', 'tools',
-                          '.idea', '.idea_modules', '.lib'))))
 
-    rsync_args += ['--delete']
+    if not disable_assembly_build:
+        build_assembly()
+
+
+    assembly_path = glob.glob(project_path + '/target/scala-*/*assembly*.jar')[0]
+
+    ssh_call(user=remote_user, host=master, key_file=key_file,
+             args=['mkdir', '-p', remote_path])
+
     rsync_call(user=remote_user,
                host=master,
                key_file=key_file,
-               args=rsync_args,
-               src_local=project_path + '/',
-               remote_path=remote_path)
+               src_local=assembly_path,
+               remote_path=remote_path + '/')
+
+    rsync_call(user=remote_user,
+               host=master,
+               key_file=key_file,
+               src_local=remote_hook_local,
+               remote_path=remote_path + '/')
 
     if disable_tmux:
         ssh_call(user=remote_user, host=master, key_file=key_file, args=[non_tmux_arg], allocate_terminal=False)
@@ -378,8 +393,8 @@ def job_run(cluster_name, job_name, job_mem,
                         region=region,
                         remote_control_dir=remote_control_dir)
                 log.info('Killed!')
-            except:
-                log.exception('Failed to kill failed job')
+            except Exception as e:
+                log.exception("Failed to kill failed job (probably it's already dead)")
         if destroy_cluster:
             log.info('Destroying cluster as requested')
             destroy(cluster_name)
@@ -578,7 +593,7 @@ def killall_jobs(cluster_name, key_file=default_key_file,
                 pid=$(cat $i)
                 children=$(pgrep -P $pid)
                 sudo kill $pid $children || true
-            done'''.format(remote_control_dir=remote_control_dir)
+            done >& /dev/null || true'''.format(remote_control_dir=remote_control_dir)
             ])
 
 

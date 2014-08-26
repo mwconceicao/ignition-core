@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # We suppose we are in a subdirectory of the root project
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 JOB_NAME="${1:?Please give a Job Name}"
 JOB_DATE="${2?Please give the Job Date}"
@@ -60,9 +60,8 @@ low_memory_opts="-Dspark.shuffle.memoryFraction=0.3 -Dspark.storage.memoryFracti
 job_opts="$basic_job_opts $low_memory_opts $compress_opts $kryo_opts $cores_option"
 
 cd "${DIR}" || notify_error_and_exit "Internal script error for job ${JOB_WITH_TAG}"
-./sbt assembly || notify_error_and_exit "Failed to build job assembly for job ${JOB_WITH_TAG}"
 
-JAR_PATH_SRC=$(echo "${DIR}"/target/scala-*/*assembly*.jar)
+JAR_PATH_SRC=$(echo "${DIR}"/*assembly*.jar)
 JAR_PATH="${JOB_CONTROL_DIR}/Ignition.jar"
 
 cp ${JAR_PATH_SRC} ${JAR_PATH}
