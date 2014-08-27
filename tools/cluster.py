@@ -350,13 +350,13 @@ def job_run(cluster_name, job_name, job_mem,
                host=master,
                key_file=key_file,
                src_local=assembly_path,
-               remote_path=remote_path + '/')
+               remote_path=with_leading_slash(remote_path))
 
     rsync_call(user=remote_user,
                host=master,
                key_file=key_file,
                src_local=remote_hook_local,
-               remote_path=remote_path + '/')
+               remote_path=with_leading_slash(remote_path))
 
     if disable_tmux:
         ssh_call(user=remote_user, host=master, key_file=key_file, args=[non_tmux_arg], allocate_terminal=False)
@@ -456,7 +456,8 @@ def collect_job_results(cluster_name, job_name, job_tag,
 
     rsync_call(user=remote_user,
                host=master,
-               args=['--remove-source-files'],
+               # Keep the RUNNING file so we can kill the job if needed
+               args=['--remove-source-files', '--exclude', 'RUNNING'],
                key_file=key_file,
                dest_local=with_leading_slash(collect_results_dir),
                remote_path=job_control_dir)
@@ -579,7 +580,7 @@ def kill_job(cluster_name, job_name, job_tag, key_file=default_key_file,
             pid=$(cat %s/RUNNING)
             children=$(pgrep -P $pid)
             sudo kill $pid $children
-        }''' % job_control_dir])
+        } >& /dev/null''' % job_control_dir])
 
 
 @named('killall')
