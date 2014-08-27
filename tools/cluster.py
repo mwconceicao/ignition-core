@@ -292,6 +292,14 @@ def rsync_call(user, host, key_file, args=[], src_local='', dest_local='', remot
 def build_assembly():
     logged_call(['/bin/bash', '-c', '(cd {} && ./sbt assembly)'.format(get_project_path())])
 
+def get_assembly_path():
+    paths = glob.glob(get_project_path() + '/target/scala-*/*assembly*.jar')
+    if paths:
+        return paths[0]
+    else:
+        return None
+
+
 @arg('job-mem', help='The amount of memory to use for this job (like: 80G)')
 @arg('--master', help="This parameter overrides the master of cluster-name")
 @arg('--disable-tmux', help='Do not use tmux. Warning: many features will not work without tmux. Use only if the tmux is missing on the master.')
@@ -340,8 +348,9 @@ def job_run(cluster_name, job_name, job_mem,
     if not disable_assembly_build:
         build_assembly()
 
-
-    assembly_path = glob.glob(project_path + '/target/scala-*/*assembly*.jar')[0]
+    assembly_path = get_assembly_path()
+    if assembly_path is None:
+        raise Exception('Something is wrong: no assembly found')
 
     ssh_call(user=remote_user, host=master, key_file=key_file,
              args=['mkdir', '-p', remote_path])
