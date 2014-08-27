@@ -456,6 +456,7 @@ def collect_job_results(cluster_name, job_name, job_tag,
 
     rsync_call(user=remote_user,
                host=master,
+               args=['--remove-source-files'],
                key_file=key_file,
                dest_local=with_leading_slash(collect_results_dir),
                remote_path=job_control_dir)
