@@ -70,6 +70,7 @@ def read_from_to(_from, to):
         read_data = True
         to.write(data)
         data = read_non_blocking(_from)
+    to.flush()
     return read_data
 
 def read_non_blocking(f):
@@ -95,7 +96,7 @@ def check_call_with_timeout(args, stdin=None, stdout=None,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
                          shell=shell,
-                         universal_newlines=True)
+                         universal_newlines=False)
     while True:
         if read_from_to(p.stdout, stdout):
             begin_time_inactivity = time.time()
