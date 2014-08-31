@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 import logging
 import boto.ec2
+import sys
+import subprocess
+import select
+import time
 
 logging.basicConfig(level=logging.INFO)
 
@@ -56,3 +60,61 @@ def tag_instances(cluster_name, tags, region):
         conn.create_tags(ids, tags)
 
     logging.info("Tagged nodes.")
+
+class ProcessTimeoutException(Exception): pass
+
+def read_from_to(_from, to):
+    data = read_non_blocking(_from)
+    read_data = False
+    while data is not None:
+        read_data = True
+        to.write(data)
+        data = read_non_blocking(_from)
+    return read_data
+
+def read_non_blocking(f):
+    result = []
+    while select.select([f], [], [], 0)[0]:
+        c = f.read(1)
+        if c:
+            result.append(c)
+        else:
+            break
+    return ''.join(result) if result else None
+
+def check_call_with_timeout(args, stdin=None, stdout=None,
+                            stderr=None, shell=False,
+                            timeout_total_minutes=0,
+                            timeout_inactivity_minutes=0):
+    stdout = stdout or sys.stdout
+    stderr = stderr or sys.stderr
+    begin_time_total = time.time()
+    begin_time_inactivity = time.time()
+    p = subprocess.Popen(args,
+                         stdin=stdin,
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE,
+                         shell=shell,
+                         universal_newlines=True)
+    while True:
+        if read_from_to(p.stdout, stdout):
+            begin_time_inactivity = time.time()
+        if read_from_to(p.stderr, stderr):
+            begin_time_inactivity = time.time()
+        if p.poll() is not None:
+            break
+        terminate_by_total_timeout = timeout_total_minutes > 0 and time.time() - begin_time_total > (timeout_total_minutes * 60)
+        terminate_by_inactivity_timeout = timeout_inactivity_minutes > 0 and time.time() - begin_time_inactivity > (timeout_inactivity_minutes * 60)
+        if terminate_by_inactivity_timeout or terminate_by_total_timeout:
+            p.terminate()
+            time.sleep(0.5)
+            p.kill()
+            message = 'Terminated by inactivity' if terminate_by_inactivity_timeout else 'Terminated by total timeout'
+            raise ProcessTimeoutException(message)
+        time.sleep(0.5)
+    read_from_to(p.stdout, stdout)
+    read_from_to(p.stderr, stderr)
+    if p.returncode != 0:
+        raise subprocess.CalledProcessError(p.returncode, args)
+    return p.returncode
+

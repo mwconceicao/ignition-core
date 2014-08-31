@@ -462,7 +462,6 @@ def launch_cluster(conn, opts, cluster_name):
         print "Launched master in %s, regid = %s" % (zone, master_res.id)
 
     # Give the instances descriptive names
-    # TODO: Add retry logic for tagging with name since it's used to identify a cluster.
     for master in master_nodes:
         name = '{cn}-master-{iid}'.format(cn=cluster_name, iid=master.id)
         for i in range(0, 5):
@@ -500,10 +499,13 @@ def get_existing_cluster(conn, opts, cluster_name, die_on_error=True):
     for res in reservations:
         active = [i for i in res.instances if is_active(i)]
         for inst in active:
+            group_names = [g.name for g in inst.groups]
             name = inst.tags.get(u'Name', "")
-            if name.startswith(cluster_name + "-master"):
+            master_name = cluster_name + "-master"
+            slave_name = cluster_name + "-slave"
+            if name.startswith(master_name) or master_name in group_names:
                 master_nodes.append(inst)
-            elif name.startswith(cluster_name + "-slave"):
+            elif name.startswith(slave_name) or slave_name + 's' in group_names:
                 slave_nodes.append(inst)
     if any((master_nodes, slave_nodes)):
         print ("Found %d master(s), %d slaves" % (len(master_nodes), len(slave_nodes)))
@@ -590,7 +592,6 @@ def get_num_disks(instance_type):
         "m1.medium":   1,
         "m1.large":    2,
         "m1.xlarge":   4,
-        "t1.micro":    1,
         "c1.medium":   1,
         "c1.xlarge":   4,
         "m2.xlarge":   1,

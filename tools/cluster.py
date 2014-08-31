@@ -14,6 +14,7 @@ import subprocess
 from subprocess import check_output, check_call
 from itertools import chain
 from utils import tag_instances, get_masters, get_active_nodes
+from utils import check_call_with_timeout, ProcessTimeoutException
 import os
 import sys
 from datetime import datetime
@@ -126,9 +127,12 @@ def chdir_to_ec2_script_and_get_path():
     return ec2_script_path
 
 
-def call_ec2_script(args):
+def call_ec2_script(args, timeout_total_minutes, timeout_inactivity_minutes):
     ec2_script_path = chdir_to_ec2_script_and_get_path()
-    return logged_call([ec2_script_path] + args)
+    return check_call_with_timeout(['/usr/bin/env', 'python', '-u',
+                                    ec2_script_path] + args,
+                                   timeout_total_minutes=timeout_total_minutes,
+                                   timeout_inactivity_minutes=timeout_inactivity_minutes)
 
 
 def cluster_exists(cluster_name, region):
@@ -188,6 +192,8 @@ def launch(cluster_name, slaves,
            max_clusters_to_create=5,
            minimum_percentage_healthy_slaves=0.9,
            remote_user=default_remote_user,
+           script_timeout_total_minutes=55,
+           script_timeout_inactivity_minutes=5,
            resume=False, just_ignore_existing=False, worker_timeout=240,
            spark_version=default_spark_version, ami=default_ami):
 
@@ -232,12 +238,19 @@ def launch(cluster_name, slaves,
                                  '--user-data', user_data,
                                  'launch', cluster_name] +
                                      resume_param +
-                                     auth_params)
+                                     auth_params,
+                                     timeout_total_minutes=script_timeout_total_minutes,
+                                     timeout_inactivity_minutes=script_timeout_inactivity_minutes)
                 success = True
             except subprocess.CalledProcessError as e:
                 resume_param = ['--resume']
                 log.warn('Failed with: %s', e)
-            tag_cluster_instances(cluster_name=cluster_name, tag=tag, env=env, region=region)
+            except Exception as e:
+                # Probably a timeout
+                log.exception('Fatal error calling EC2 script')
+                break
+            finally:
+                tag_cluster_instances(cluster_name=cluster_name, tag=tag, env=env, region=region)
 
             if success:
                 break
@@ -260,7 +273,8 @@ def destroy(cluster_name, delete_groups=False, region=default_region):
     delete_sg_param = ['--delete-groups'] if delete_groups else []
 
     ec2_script_path = chdir_to_ec2_script_and_get_path()
-    p = subprocess.Popen([ec2_script_path,
+    p = subprocess.Popen(['/usr/bin/env', 'python', '-u',
+                          ec2_script_path,
                           'destroy', cluster_name,
                           '--region', region] + delete_sg_param,
                          stdin=subprocess.PIPE,
@@ -480,7 +494,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                  region=default_region,
                  remote_control_dir=default_remote_control_dir,
                  collect_results_dir=default_collect_results_dir,
-                 job_timeout_minutes=0, max_failures=10, seconds_to_sleep=60):
+                 job_timeout_minutes=0, max_failures=5, seconds_to_sleep=60):
 
     master = master or get_master(cluster_name, region=region)
 
@@ -557,6 +571,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                 log.warn('Received unexpected response while checking job status: {}'.format(output))
                 failures += 1
                 last_failure = 'Unexpected response: {}'.format(output)
+            health_check(cluster_name=cluster_name, key_file=key_file, master=master, remote_user=remote_user)
         except subprocess.CalledProcessError as e:
             failures += 1
             log.exception('Got exception')
@@ -568,7 +583,6 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
         if job_timeout_minutes > 0 and (time.time() - start_time) / 60 >= job_timeout_minutes:
             collect(show_tail=True)
             raise JobFailure('Timed out')
-        health_check(cluster_name=cluster_name, key_file=key_file, master=master, remote_user=remote_user)
         log.debug('Sleeping for {} seconds before checking new status'.format(seconds_to_sleep))
         time.sleep(seconds_to_sleep)
 
