@@ -2,7 +2,7 @@ package ignition.core.jobs
 
 import scala.util.Try
 
-trait JobSetup {
+trait ExecutionRetry {
 
   def executeRetrying[T](code: => T, maxExecutions: Int = 3): T = {
     assert(maxExecutions > 0) // we will execute at least once
@@ -19,4 +19,5 @@ trait JobSetup {
 
     _executeRetrying(maxExecutions - 1).get
   }
+
 }
