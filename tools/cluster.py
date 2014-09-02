@@ -193,7 +193,7 @@ def launch(cluster_name, slaves,
            minimum_percentage_healthy_slaves=0.9,
            remote_user=default_remote_user,
            script_timeout_total_minutes=55,
-           script_timeout_inactivity_minutes=5,
+           script_timeout_inactivity_minutes=10,
            resume=False, just_ignore_existing=False, worker_timeout=240,
            spark_version=default_spark_version, ami=default_ami):
 
