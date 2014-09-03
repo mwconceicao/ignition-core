@@ -25,7 +25,7 @@ class S3Client {
     null, null, jets3tProperties
   )
 
-  def writeContent(bucket: String, key: String, content: String) {
+  def writeContent(bucket: String, key: String, content: String): S3Object = {
     val obj = new S3Object(key, content)
     obj.setContentType("text/plain")
     service.putObject(bucket, obj)
