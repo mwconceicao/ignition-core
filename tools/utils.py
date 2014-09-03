@@ -108,7 +108,10 @@ def check_call_with_timeout(args, stdin=None, stdout=None,
         terminate_by_inactivity_timeout = timeout_inactivity_minutes > 0 and time.time() - begin_time_inactivity > (timeout_inactivity_minutes * 60)
         if terminate_by_inactivity_timeout or terminate_by_total_timeout:
             p.terminate()
-            time.sleep(0.5)
+            for i in range(100):
+                if p.poll is not None:
+                    break
+                time.sleep(0.1)
             p.kill()
             message = 'Terminated by inactivity' if terminate_by_inactivity_timeout else 'Terminated by total timeout'
             raise ProcessTimeoutException(message)
