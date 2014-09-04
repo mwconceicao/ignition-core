@@ -66,6 +66,7 @@ JAR_PATH="${JOB_CONTROL_DIR}/Ignition.jar"
 
 cp ${JAR_PATH_SRC} ${JAR_PATH}
 
+export SPARK_JAVA_OPTS="-Xms1G -Xmx1G"
 export SPARK_MEM=${SPARK_MEM_PARAM}
 export JOB_MASTER=${MASTER}
 
