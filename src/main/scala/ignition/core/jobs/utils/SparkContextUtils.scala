@@ -4,6 +4,7 @@ import org.apache.hadoop.io.LongWritable
 import org.apache.spark.SparkContext
 import org.apache.hadoop.fs.{FileStatus, Path, FileSystem}
 import org.apache.spark.rdd.RDD
+import org.joda.time.DateTime
 
 
 object SparkContextUtils {
@@ -48,37 +49,56 @@ object SparkContextUtils {
       finalFiles.mkString(",")
     }
 
-    def nonEmptyTextFile(path: String): RDD[String] = {
+    private def nonEmptyTextFile(path: String): RDD[String] = {
       sc.textFile(nonEmptyFilesPath(path))
     }
 
-    def getPathsFor(path: String, requireSuccess: Boolean): Seq[String] = {
-      sortedGlobPath(path).reverse.dropWhile(p => requireSuccess && sortedGlobPath(s"$p/{_SUCCESS,_FINISHED}", removeEmpty = false).isEmpty).reverse
+    private def filterPaths(path: String, requireSuccess: Boolean = false, startDate: Option[DateTime], endDate: Option[DateTime]): Seq[String] = {
+      val basePaths = sortedGlobPath(path).reverse.dropWhile(p => requireSuccess && sortedGlobPath(s"$p/{_SUCCESS,_FINISHED}", removeEmpty = false).isEmpty).reverse
+      if (startDate.isEmpty && endDate.isEmpty)
+          basePaths
+      else
+        basePaths.filter(p => {
+          val date = PathUtils.extractDate(p)
+          val goodStartDate = startDate.isEmpty || date.equals(startDate.get) || date.isAfter(startDate.get)
+          val goodEndDate = endDate.isEmpty || date.equals(endDate.get) || date.isBefore(endDate.get)
+          goodStartDate && goodEndDate
+        })
     }
 
-    def lastNonEmptyTextFile(path: String, lastN: Int = 1, requireSuccess: Boolean = false): RDD[String] = {
-      require(lastN > 0)
-      val paths = getPathsFor(path, requireSuccess)
-      if (paths.size < lastN) {
-        throw new Exception(s"Tried to get last $lastN files/dirs of path $path, but the resulting number of paths $paths is less than the required")
-      } else {
-        sc.nonEmptyTextFile(paths.takeRight(lastN).mkString(","))
-      }
+    def getFilteredPaths(path: String, requireSuccess: Boolean,
+                         startDate: Option[DateTime],
+                         endDate: Option[DateTime], lastN: Option[Int]): Seq[String] = {
+      require(lastN.isEmpty || endDate.isDefined, "If you are going to get the last files, better specify the end date to avoid getting files in the future")
+      val paths = filterPaths(path, requireSuccess, startDate, endDate)
+      if (lastN.isEmpty) paths else paths.takeRight(lastN.get)
     }
 
-    def stringHadoopFile(path: String): RDD[String] = {
+    def filterAndGetTextFiles(path: String, requireSuccess: Boolean = false,
+                              startDate: Option[DateTime] = None,
+                              endDate: Option[DateTime] = None,
+                              lastN: Option[Int] = None): RDD[String] = {
+      val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN).mkString(",")
+      if (paths.isEmpty)
+        throw new Exception(s"Tried to get by date with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
+      else
+        nonEmptyTextFile(paths)
+    }
+
+    private def stringHadoopFile(path: String): RDD[String] = {
       sc.sequenceFile(nonEmptyFilesPath(path), classOf[LongWritable], classOf[org.apache.hadoop.io.BytesWritable])
         .map({ case (k, v) => new String(v.getBytes) })
     }
 
-    def lastStringHadoopFiles(path: String, lastN: Int = 1, requireSuccess: Boolean = false): RDD[String] = {
-      require(lastN > 0)
-      val paths = getPathsFor(path, requireSuccess)
-      if (paths.size < lastN) {
-        throw new Exception(s"Tried to get last $lastN files/dirs of path $path, but the resulting number of paths $paths is less than the required")
-      } else {
-        sc.stringHadoopFile(paths.takeRight(lastN).mkString(","))
-      }
+    def filterAndGetStringHadoopFiles(path: String, requireSuccess: Boolean = false,
+                                      startDate: Option[DateTime] = None,
+                                      endDate: Option[DateTime] = None,
+                                      lastN: Option[Int] = None): RDD[String] = {
+      val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN).mkString(",")
+      if (paths.isEmpty)
+        throw new Exception(s"Tried to get by date with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
+      else
+        stringHadoopFile(getFilteredPaths(path, requireSuccess, startDate, endDate, lastN).mkString(","))
     }
   }
 }
