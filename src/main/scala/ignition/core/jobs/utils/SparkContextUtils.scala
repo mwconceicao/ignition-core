@@ -25,6 +25,11 @@ object SparkContextUtils {
       } yield status
     }
 
+    private def delete(path: Path): Unit = {
+      val fs = getFileSystem(path)
+      fs.delete(path, true)
+    }
+
     // This call is equivalent to a ls -d in shell, but won't fail if part of a path matches nothing,
     // For instance, given path = s3n://bucket/{a,b}, it will work fine if a exists but b is missing
     def sortedGlobPath(path: String, removeEmpty: Boolean = true): Seq[String] = {
@@ -74,15 +79,39 @@ object SparkContextUtils {
       if (lastN.isEmpty) paths else paths.takeRight(lastN.get)
     }
 
-    def filterAndGetTextFiles(path: String, requireSuccess: Boolean = false,
+
+    lazy val hdfsPathPrefix = sc.master.replaceFirst("spark://(.*):7077", "hdfs://$1:9000/")
+
+    def synchToHdfs(paths: Seq[String], forceSynch: Boolean): Seq[String] = {
+      def mapPaths(actionWhenNeedsSynching: (String, String) => Unit): Seq[String] = {
+        paths.map(p => {
+          val hdfsPath = p.replace("s3n://", hdfsPathPrefix)
+          if (forceSynch || getStatus(hdfsPath, false).isEmpty || getStatus(s"$hdfsPath/*", true).filter(_.isFile).size != sc.defaultParallelism) {
+            val _hdfsPath = new Path(hdfsPath)
+            actionWhenNeedsSynching(p, hdfsPath)
+          }
+          hdfsPath
+        })
+      }
+      // We delete first because we may have two paths in the same parent
+      mapPaths((p, hdfsPath) => delete(new Path(hdfsPath).getParent))// delete parent to avoid old files being accumulated
+      mapPaths((p, hdfsPath) => nonEmptyTextFile(p).coalesce(sc.defaultParallelism, true).saveAsTextFile(hdfsPath))
+    }
+
+    def filterAndGetTextFiles(path: String,
+                              requireSuccess: Boolean = false,
                               startDate: Option[DateTime] = None,
                               endDate: Option[DateTime] = None,
-                              lastN: Option[Int] = None): RDD[String] = {
-      val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN).mkString(",")
+                              lastN: Option[Int] = None,
+                              synchLocally: Boolean = false,
+                              forceSynch: Boolean = false): RDD[String] = {
+      val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN)
       if (paths.isEmpty)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
+      else if (synchLocally)
+        nonEmptyTextFile(synchToHdfs(paths, forceSynch).mkString(","))
       else
-        nonEmptyTextFile(paths)
+        nonEmptyTextFile(paths.mkString(","))
     }
 
     private def stringHadoopFile(path: String): RDD[String] = {
@@ -94,11 +123,11 @@ object SparkContextUtils {
                                       startDate: Option[DateTime] = None,
                                       endDate: Option[DateTime] = None,
                                       lastN: Option[Int] = None): RDD[String] = {
-      val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN).mkString(",")
+      val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN)
       if (paths.isEmpty)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else
-        stringHadoopFile(getFilteredPaths(path, requireSuccess, startDate, endDate, lastN).mkString(","))
+        stringHadoopFile(paths.mkString(","))
     }
   }
 }
