@@ -80,7 +80,7 @@ object SparkContextUtils {
                               lastN: Option[Int] = None): RDD[String] = {
       val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN).mkString(",")
       if (paths.isEmpty)
-        throw new Exception(s"Tried to get by date with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
+        throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else
         nonEmptyTextFile(paths)
     }
@@ -96,7 +96,7 @@ object SparkContextUtils {
                                       lastN: Option[Int] = None): RDD[String] = {
       val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN).mkString(",")
       if (paths.isEmpty)
-        throw new Exception(s"Tried to get by date with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
+        throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else
         stringHadoopFile(getFilteredPaths(path, requireSuccess, startDate, endDate, lastN).mkString(","))
     }
