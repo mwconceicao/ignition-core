@@ -159,7 +159,20 @@ def save_cluster_args(master, key_file, remote_user, all_args):
              args=["echo '{}' > /tmp/cluster_args.json".format(json.dumps(all_args))])
 
 def load_cluster_args(master, key_file, remote_user):
-    return json.loads(ssh_call(user=remote_user, host=master, key_file=key_file, args=["cat", "/tmp/cluster_args.json"], get_output=True))
+    return json.loads(ssh_call(user=remote_user, host=master, key_file=key_file,
+                               args=["cat", "/tmp/cluster_args.json"], get_output=True))
+
+# Util to be used by external scripts
+def save_extra_data(data_str, cluster_name, region=default_region, key_file=default_key_file, remote_user=default_remote_user, master=None):
+    master = master or get_master(cluster_name, region=region)
+    ssh_call(user=remote_user, host=master, key_file=key_file,
+             args=["echo '{}' > /tmp/cluster_extra_data.txt".format(data_str)])
+
+def load_extra_data(cluster_name, region=default_region, key_file=default_key_file, remote_user=default_remote_user, master=None):
+    master = master or get_master(cluster_name, region=region)
+    return ssh_call(user=remote_user, host=master, key_file=key_file,
+                    args=["cat", "/tmp/cluster_extra_data.txt"], get_output=True)
+
 
 
 tag_help_text = 'Use multiple times, like: --tag tag1=value1 --tag tag2=value'
