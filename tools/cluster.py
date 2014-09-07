@@ -336,7 +336,7 @@ def get_assembly_path():
 def job_run(cluster_name, job_name, job_mem,
             key_file=default_key_file, disable_tmux=False,
             detached=False, notify_on_errors=False, yarn=False,
-            job_user = getpass.getuser(),
+            job_user=getpass.getuser(),
             job_timeout_minutes=0,
             remote_user=default_remote_user, utc_job_date=None, job_tag=None,
             disable_wait_completion=False, collect_results_dir=default_collect_results_dir,
@@ -403,6 +403,7 @@ def job_run(cluster_name, job_name, job_mem,
         failed = False
         failed_exception = None
         try:
+            time.sleep(1)
             wait_for_job(cluster_name=cluster_name, job_name=job_name,
                          job_tag=job_tag, key_file=key_file, master=master,
                          job_timeout_minutes=job_timeout_minutes,
