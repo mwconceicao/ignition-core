@@ -1,7 +1,7 @@
 package ignition.core.jobs
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.joda.time.DateTime
+import org.joda.time.{DateTimeZone, DateTime}
 
 object CoreJobRunner {
 
@@ -10,7 +10,7 @@ object CoreJobRunner {
 
 
   case class RunnerConfig(setupName: String = "nosetup",
-                          date: DateTime = DateTime.now,
+                          date: DateTime = DateTime.now.withZone(DateTimeZone.UTC),
                           tag: String = "notag",
                           user: String = "nouser",
                           master: String = "local[*]",

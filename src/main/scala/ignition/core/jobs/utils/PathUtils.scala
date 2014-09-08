@@ -7,7 +7,7 @@ import scala.util.Try
 
 object PathUtils {
 
-  private val datePatterns = Seq(DateTimeFormat.forPattern("'dt='yyyy-MM-dd").withZoneUTC(), // mail-dumper format
+  private val datePatterns = Seq(DateTimeFormat.forPattern("'dt='yyyy-MM-dd").withZone(DateTimeZone.forID("America/Sao_Paulo")), // mail-dumper format
     DateTimeFormat.forPattern("yyyy-MM-dd").withZoneUTC(), // platform format
     DateTimeFormat.forPattern("yyyyMMdd-HHmmss").withZoneUTC(), // engine format
     DateTimeFormat.forPattern("yyyyMMdd_HHmmss").withZone(DateTimeZone.forID("America/Sao_Paulo")), // EP format

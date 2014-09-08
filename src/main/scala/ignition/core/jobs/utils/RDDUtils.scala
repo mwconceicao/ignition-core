@@ -52,15 +52,6 @@ object RDDUtils {
     def incrementCounterIf(cond: (V) => Boolean, acc: spark.Accumulator[Int]): RDD[V] = {
       rdd.map(x => { if (cond(x)) acc += 1; x })
     }
-
-    def saveAsTextFileWithDate(path: String, date: DateTime) {
-      val format = DateTimeFormat.forPattern("yyyy_MM_dd_HH_mm_ss")
-      rdd.saveAsTextFile(path + format.print(date))
-    }
-
-    def saveAsTextFileWithDate(path: String) {
-      rdd.saveAsTextFileWithDate(path, DateTime.now)
-    }
   }
 
   implicit class PairRDDImprovements[K: ClassTag, V: ClassTag](rdd: RDD[(K, V)]) {

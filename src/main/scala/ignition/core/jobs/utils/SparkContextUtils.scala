@@ -4,7 +4,7 @@ import org.apache.hadoop.io.LongWritable
 import org.apache.spark.SparkContext
 import org.apache.hadoop.fs.{FileStatus, Path, FileSystem}
 import org.apache.spark.rdd.RDD
-import org.joda.time.DateTime
+import org.joda.time.{DateTimeZone, DateTime}
 
 
 object SparkContextUtils {
@@ -65,8 +65,8 @@ object SparkContextUtils {
       else
         basePaths.filter(p => {
           val date = PathUtils.extractDate(p)
-          val goodStartDate = startDate.isEmpty || date.equals(startDate.get) || date.isAfter(startDate.get)
-          val goodEndDate = endDate.isEmpty || date.equals(endDate.get) || date.isBefore(endDate.get)
+          val goodStartDate = startDate.isEmpty || date.withZone(DateTimeZone.UTC).equals(startDate.get.withZone(DateTimeZone.UTC)) || date.isAfter(startDate.get)
+          val goodEndDate = endDate.isEmpty || date.withZone(DateTimeZone.UTC).equals(endDate.get.withZone(DateTimeZone.UTC)) || date.isBefore(endDate.get)
           goodStartDate && goodEndDate
         })
     }
