@@ -403,7 +403,6 @@ def job_run(cluster_name, job_name, job_mem,
         failed = False
         failed_exception = None
         try:
-            time.sleep(1)
             wait_for_job(cluster_name=cluster_name, job_name=job_name,
                          job_tag=job_tag, key_file=key_file, master=master,
                          job_timeout_minutes=job_timeout_minutes,
@@ -519,7 +518,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
     job_control_dir = get_job_control_dir(remote_control_dir, job_with_tag)
 
     ssh_call_check_status = [
-                '''([ ! -e {path} ] && echo LOSTCONTROL) ||
+                '''([ ! -e {path} ] && echo WAITINGCONTROL) ||
                    ([ -e {path}/RUNNING ] && ps -p $(cat {path}/RUNNING) >& /dev/null && echo RUNNING) ||
                    ([ -e {path}/SUCCESS ] && echo SUCCESS) ||
                    ([ -e {path}/FAILURE ] && echo FAILURE) ||
@@ -568,13 +567,10 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                 log.error('Job failed...')
                 collect(show_tail=True)
                 raise JobFailure('Job failed...')
-            elif output == 'LOSTCONTROL':
-                log.error('''No control directory found for the job. Possible explanations:
-                          1) The given job name and tag are wrong
-                          2) The given master server is wrong
-                          3) Something is messing around with the server (rebooting it or deleting files)
-                          4) The script has a bug (I really doubt ;)''')
-                raise JobFailure('Lost control...') # TODO: notify
+            elif output == 'WAITINGCONTROL':
+                log.warn('''Control directory is still missing. If this happens again on next check, perhaps the remote hook died before running''')
+                failures += 1
+                last_failure = 'Control missing'
             elif output == 'KILLED':
                 log.warn('Job has been killed before finishing')
                 collect(show_tail=True)
