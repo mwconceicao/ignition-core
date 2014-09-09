@@ -40,7 +40,7 @@ object SparkContextUtils {
     // This method's purpose is to skip empty files on a given path (to work around the fact that empty files gives errors to hadoop)
     // if the path expands only to files, it will just filter out the empty ones
     // if it expands to a directory, then it will get all non empty files from this directory (but will ignore subdirectories)
-    def nonEmptyFilesPath(path: String): String = {
+    def nonEmptyFilesPath(path: String, failOnEmpty: Boolean = true): Set[String] = {
       // getStatus only get non empty files
       val status = getStatus(path, removeEmpty = true)
       val (dirs, files) = status.partition(f => f.isDirectory)
@@ -48,35 +48,61 @@ object SparkContextUtils {
       val finalFilesStatus = files.filter(_.isFile) ++ filesFromDirs
       val finalFiles = finalFilesStatus.map(_.getPath.toString).toSet
 
-      if (finalFiles.isEmpty)
+      if (failOnEmpty && finalFiles.isEmpty)
         throw new Exception(s"Zero non-empty files matched by: $path")
 
-      finalFiles.mkString(",")
+      finalFiles
     }
 
-    private def nonEmptyTextFile(path: String): RDD[String] = {
-      sc.textFile(nonEmptyFilesPath(path))
+    // This function will expand the paths then group they and give to RDDs
+    // We group to avoid too many RDDs on union (each RDD take some memory on driver)
+    // We avoid passing a path too big to one RDD to avoid a Hadoop bug where just part of the path is processed when the path is big
+    private def processPaths(f: (String) => RDD[String], initialPaths: Seq[String]): RDD[String] = {
+      require(initialPaths.nonEmpty)
+      val processedPaths = for {
+        p <- initialPaths
+        nonEmptyPath <- nonEmptyFilesPath(p, failOnEmpty = false)
+      } yield nonEmptyPath
+
+      if (processedPaths.isEmpty)
+        throw new Exception(s"No path with files found for $initialPaths")
+
+      val rdds = processedPaths.grouped(50).map(pathGroup => f(pathGroup.mkString(",")))
+
+      rdds.reduce(_ union _)
     }
 
-    private def filterPaths(path: String, requireSuccess: Boolean = false, startDate: Option[DateTime], endDate: Option[DateTime]): Seq[String] = {
-      val basePaths = sortedGlobPath(path).reverse.dropWhile(p => requireSuccess && sortedGlobPath(s"$p/{_SUCCESS,_FINISHED}", removeEmpty = false).isEmpty).reverse
-      if (startDate.isEmpty && endDate.isEmpty)
-          basePaths
+    private def nonEmptyTextFile(paths: Seq[String]): RDD[String] = {
+      processPaths((p) => sc.textFile(p), paths)
+    }
+
+    private def filterPaths(path: String, requireSuccess: Boolean = false,
+                            startDate: Option[DateTime], endDate: Option[DateTime], lastN: Option[Int]): Seq[String] = {
+      val sortedPaths = sortedGlobPath(path)
+      val filteredByDate = if (startDate.isEmpty && endDate.isEmpty)
+        sortedPaths
       else
-        basePaths.filter(p => {
+        sortedPaths.filter(p => {
           val date = PathUtils.extractDate(p)
           val goodStartDate = startDate.isEmpty || date.withZone(DateTimeZone.UTC).equals(startDate.get.withZone(DateTimeZone.UTC)) || date.isAfter(startDate.get)
           val goodEndDate = endDate.isEmpty || date.withZone(DateTimeZone.UTC).equals(endDate.get.withZone(DateTimeZone.UTC)) || date.isBefore(endDate.get)
           goodStartDate && goodEndDate
         })
+
+      // Use a stream here to avoid checking the success if we are going to just take a few files
+      val filteredBySuccessAndReversed = filteredByDate.reverse.toStream.dropWhile(p => requireSuccess && sortedGlobPath(s"$p/{_SUCCESS,_FINISHED}", removeEmpty = false).isEmpty)
+
+      if (lastN.isDefined)
+        filteredBySuccessAndReversed.take(lastN.get).reverse.toList
+      else
+        filteredBySuccessAndReversed.reverse.toList
     }
 
     def getFilteredPaths(path: String, requireSuccess: Boolean,
                          startDate: Option[DateTime],
                          endDate: Option[DateTime], lastN: Option[Int]): Seq[String] = {
       require(lastN.isEmpty || endDate.isDefined, "If you are going to get the last files, better specify the end date to avoid getting files in the future")
-      val paths = filterPaths(path, requireSuccess, startDate, endDate)
-      if (lastN.isEmpty) paths else paths.takeRight(lastN.get)
+      filterPaths(path, requireSuccess, startDate, endDate, lastN)
     }
 
 
@@ -95,7 +121,7 @@ object SparkContextUtils {
       }
       // We delete first because we may have two paths in the same parent
       mapPaths((p, hdfsPath) => delete(new Path(hdfsPath).getParent))// delete parent to avoid old files being accumulated
-      mapPaths((p, hdfsPath) => nonEmptyTextFile(p).coalesce(sc.defaultParallelism, true).saveAsTextFile(hdfsPath))
+      mapPaths((p, hdfsPath) => nonEmptyTextFile(Seq(p)).coalesce(sc.defaultParallelism, true).saveAsTextFile(hdfsPath))
     }
 
     def filterAndGetTextFiles(path: String,
@@ -109,14 +135,14 @@ object SparkContextUtils {
       if (paths.isEmpty)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else if (synchLocally)
-        nonEmptyTextFile(synchToHdfs(paths, forceSynch).mkString(","))
+        nonEmptyTextFile(synchToHdfs(paths, forceSynch))
       else
-        nonEmptyTextFile(paths.mkString(","))
+        nonEmptyTextFile(paths)
     }
 
-    private def stringHadoopFile(path: String): RDD[String] = {
-      sc.sequenceFile(nonEmptyFilesPath(path), classOf[LongWritable], classOf[org.apache.hadoop.io.BytesWritable])
-        .map({ case (k, v) => new String(v.getBytes) })
+    private def stringHadoopFile(paths: Seq[String]): RDD[String] = {
+      processPaths((p) => sc.sequenceFile(p, classOf[LongWritable], classOf[org.apache.hadoop.io.BytesWritable])
+                .map({ case (k, v) => new String(v.getBytes) }), paths)
     }
 
     def filterAndGetStringHadoopFiles(path: String, requireSuccess: Boolean = false,
@@ -127,7 +153,7 @@ object SparkContextUtils {
       if (paths.isEmpty)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else
-        stringHadoopFile(paths.mkString(","))
+        stringHadoopFile(paths)
     }
   }
 }

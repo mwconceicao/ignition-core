@@ -70,6 +70,7 @@ fi
 
 
 if [[ "${JOB_NAME}" == "shell" ]]; then
+    export ADD_JARS=${JAR_PATH}
     sudo -E ${SPARK_HOME}/bin/spark-shell || notify_error_and_exit "Execution failed for shell"
 else
     JOB_OUTPUT="${JOB_CONTROL_DIR}/output.log"
