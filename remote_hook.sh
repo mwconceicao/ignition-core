@@ -51,14 +51,6 @@ source "${SPARK_HOME}/conf/spark-env.sh"
 
 MAIN_CLASS="ignition.jobs.Runner"
 
-basic_job_opts="-Dspark.logConf=true -Dspark.default.parallelism=640 -Dspark.akka.frameSize=15 -verbose:gc -XX:-PrintGCDetails -XX:+PrintGCTimeStamps -Dspark.speculation=true"
-#kryo_opts="-Dspark.serializer=org.apache.spark.serializer.KryoSerializer -Dspark.kryoserializer.buffer.mb=20"
-compress_opts="-Dspark.hadoop.mapreduce.output.fileoutputformat.compress=true -Dspark.hadoop.mapreduce.output.fileoutputformat.compress.codec=org.apache.hadoop.io.compress.GzipCodec -Dspark.hadoop.mapreduce.output.fileoutputformat.compress.type=BLOCK"
-low_memory_opts="-Dspark.shuffle.memoryFraction=0.3 -Dspark.storage.memoryFraction=0.3 -Dspark.reducer.maxMbInFlight=10 -XX:-UseGCOverheadLimit"
-#cores_option="-Dspark.cores.max=320"
-
-job_opts="$basic_job_opts $low_memory_opts $compress_opts $kryo_opts $cores_option"
-
 cd "${DIR}" || notify_error_and_exit "Internal script error for job ${JOB_WITH_TAG}"
 
 JAR_PATH_SRC=$(echo "${DIR}"/*assembly*.jar)
@@ -66,8 +58,6 @@ JAR_PATH="${JOB_CONTROL_DIR}/Ignition.jar"
 
 cp ${JAR_PATH_SRC} ${JAR_PATH}
 
-export SPARK_JAVA_OPTS="-Xms1G -Xmx1G"
-export SPARK_MEM=${SPARK_MEM_PARAM}
 export JOB_MASTER=${MASTER}
 
 if [[ "${USE_YARN}" == "yes" ]]; then
@@ -75,18 +65,17 @@ if [[ "${USE_YARN}" == "yes" ]]; then
     export JOB_MASTER="yarn-client"
     export SPARK_JAR=$(echo ${SPARK_HOME}/assembly/target/scala-*/spark-assembly-*.jar)
     export SPARK_YARN_APP_JAR=${JAR_PATH}
-    export SPARK_WORKER_MEMORY=${SPARK_MEM}
+    export SPARK_WORKER_MEMORY=${SPARK_MEM_PARAM}
 fi
 
 
 if [[ "${JOB_NAME}" == "shell" ]]; then
-    export ADD_JARS="${JAR_PATH}"
-    export SPARK_REPL_OPTS="$job_opts"
+    export ADD_JARS=${JAR_PATH}
     sudo -E ${SPARK_HOME}/bin/spark-shell || notify_error_and_exit "Execution failed for shell"
 else
     JOB_OUTPUT="${JOB_CONTROL_DIR}/output.log"
     tail -F "${JOB_OUTPUT}" &
-    sudo -E java ${SPARK_JAVA_OPTS} -Djava.io.tmpdir=/mnt/hadoop $job_opts -cp ${JAR_PATH}:$(${SPARK_HOME}/bin/compute-classpath.sh) "${MAIN_CLASS}" "${JOB_NAME}" --date "${JOB_DATE}" --tag "${JOB_TAG}" --user "${JOB_USER}" --master "${JOB_MASTER}" >& "${JOB_OUTPUT}" || notify_error_and_exit "Execution failed for job ${JOB_WITH_TAG}"
+    sudo -E "${SPARK_HOME}/bin/spark-submit" --master "${JOB_MASTER}" --driver-memory 1500M --driver-java-options "-Djava.io.tmpdir=/mnt -verbose:gc -XX:-PrintGCDetails -XX:+PrintGCTimeStamps" --class "${MAIN_CLASS}" ${JAR_PATH} "${JOB_NAME}" --runner-date "${JOB_DATE}" --runner-tag "${JOB_TAG}" --runner-user "${JOB_USER}" --runner-master "${JOB_MASTER}" --runner-executor-memory "${SPARK_MEM_PARAM}" >& "${JOB_OUTPUT}" || notify_error_and_exit "Execution failed for job ${JOB_WITH_TAG}"
 fi
 
 touch "${JOB_CONTROL_DIR}/SUCCESS"

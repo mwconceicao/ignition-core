@@ -159,7 +159,20 @@ def save_cluster_args(master, key_file, remote_user, all_args):
              args=["echo '{}' > /tmp/cluster_args.json".format(json.dumps(all_args))])
 
 def load_cluster_args(master, key_file, remote_user):
-    return json.loads(ssh_call(user=remote_user, host=master, key_file=key_file, args=["cat", "/tmp/cluster_args.json"], get_output=True))
+    return json.loads(ssh_call(user=remote_user, host=master, key_file=key_file,
+                               args=["cat", "/tmp/cluster_args.json"], get_output=True))
+
+# Util to be used by external scripts
+def save_extra_data(data_str, cluster_name, region=default_region, key_file=default_key_file, remote_user=default_remote_user, master=None):
+    master = master or get_master(cluster_name, region=region)
+    ssh_call(user=remote_user, host=master, key_file=key_file,
+             args=["echo '{}' > /tmp/cluster_extra_data.txt".format(data_str)])
+
+def load_extra_data(cluster_name, region=default_region, key_file=default_key_file, remote_user=default_remote_user, master=None):
+    master = master or get_master(cluster_name, region=region)
+    return ssh_call(user=remote_user, host=master, key_file=key_file,
+                    args=["cat", "/tmp/cluster_extra_data.txt"], get_output=True)
+
 
 
 tag_help_text = 'Use multiple times, like: --tag tag1=value1 --tag tag2=value'
@@ -323,7 +336,7 @@ def get_assembly_path():
 def job_run(cluster_name, job_name, job_mem,
             key_file=default_key_file, disable_tmux=False,
             detached=False, notify_on_errors=False, yarn=False,
-            job_user = getpass.getuser(),
+            job_user=getpass.getuser(),
             job_timeout_minutes=0,
             remote_user=default_remote_user, utc_job_date=None, job_tag=None,
             disable_wait_completion=False, collect_results_dir=default_collect_results_dir,
@@ -505,7 +518,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
     job_control_dir = get_job_control_dir(remote_control_dir, job_with_tag)
 
     ssh_call_check_status = [
-                '''([ ! -e {path} ] && echo LOSTCONTROL) ||
+                '''([ ! -e {path} ] && echo WAITINGCONTROL) ||
                    ([ -e {path}/RUNNING ] && ps -p $(cat {path}/RUNNING) >& /dev/null && echo RUNNING) ||
                    ([ -e {path}/SUCCESS ] && echo SUCCESS) ||
                    ([ -e {path}/FAILURE ] && echo FAILURE) ||
@@ -554,13 +567,10 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                 log.error('Job failed...')
                 collect(show_tail=True)
                 raise JobFailure('Job failed...')
-            elif output == 'LOSTCONTROL':
-                log.error('''No control directory found for the job. Possible explanations:
-                          1) The given job name and tag are wrong
-                          2) The given master server is wrong
-                          3) Something is messing around with the server (rebooting it or deleting files)
-                          4) The script has a bug (I really doubt ;)''')
-                raise JobFailure('Lost control...') # TODO: notify
+            elif output == 'WAITINGCONTROL':
+                log.warn('''Control directory is still missing. If this happens again on next check, perhaps the remote hook died before running''')
+                failures += 1
+                last_failure = 'Control missing'
             elif output == 'KILLED':
                 log.warn('Job has been killed before finishing')
                 collect(show_tail=True)
