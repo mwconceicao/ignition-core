@@ -366,9 +366,9 @@ def job_run(cluster_name, job_name, job_mem,
     job_date = utc_job_date or datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     job_tag = job_tag or job_date.replace(':', '_').replace('-', '_').replace('Z', 'UTC')
     tmux_wait_command = ';(echo Press enter to keep the session open && /bin/bash -c "read -t 5" && sleep 7d)' if not detached else ''
-    tmux_arg = ". /etc/profile; . ~/.profile;tmux new-session {detached} -s spark.{job_name}.{job_tag} '{aws_vars} {remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param} {tmux_wait_command}'".format(
+    tmux_arg = ". /etc/profile; . ~/.profile;tmux new-session {detached} -s spark.{job_name}.{job_tag} '{aws_vars} {remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param} {tmux_wait_command}' >& /tmp/commandoutput".format(
         aws_vars=get_aws_keys_str(), job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, detached='-d' if detached else '', yarn_param=yarn_param, notify_param=notify_param, tmux_wait_command=tmux_wait_command)
-    non_tmux_arg = ". /etc/profile; . ~/.profile;{aws_vars} {remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param}".format(
+    non_tmux_arg = ". /etc/profile; . ~/.profile;{aws_vars} {remote_hook} {job_name} {job_date} {job_tag} {job_user} {remote_control_dir} {spark_mem} {yarn_param} {notify_param} >& /tmp/commandoutput".format(
         aws_vars=get_aws_keys_str(), job_name=job_name, job_date=job_date, job_tag=job_tag, job_user=job_user, remote_control_dir=remote_control_dir, remote_hook=remote_hook, spark_mem=job_mem, yarn_param=yarn_param, notify_param=notify_param)
 
 
@@ -394,6 +394,7 @@ def job_run(cluster_name, job_name, job_mem,
                src_local=remote_hook_local,
                remote_path=with_leading_slash(remote_path))
 
+    log.info('Will run job in remote host')
     if disable_tmux:
         ssh_call(user=remote_user, host=master, key_file=key_file, args=[non_tmux_arg], allocate_terminal=False)
     else:
@@ -569,6 +570,17 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                 raise JobFailure('Job failed...')
             elif output == 'WAITINGCONTROL':
                 log.warn('''Control directory is still missing. If this happens again on next check, perhaps the remote hook died before running''')
+                commands = [
+                    ['ls', '-lR', '/home', '/tmp'],
+                    ['free', '-m'],
+                    ['tmux', 'list-sessions'],
+                    ['df', '-h'],
+                    ['cat', '/tmp/commandoutput'],
+                    ['ps', 'auxef']
+                ]
+                log.info('Will run some commands for posterior investigation of the problem')
+                for command in commmands:
+                    ssh_call(user=remote_user, host=master, key_file=key_file, args=command)
                 failures += 1
                 last_failure = 'Control missing'
             elif output == 'KILLED':
@@ -587,7 +599,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
             log.exception('Got exception')
             last_failure = 'Exception: {}'.format(e)
         if failures > max_failures:
-            log.error('Too many failures while checking job status, the last one was {}'.format(e))
+            log.error('Too many failures while checking job status, the last one was {}'.format(last_failure))
             collect(show_tail=True)
             raise JobFailure('Too many failures')
         if job_timeout_minutes > 0 and (time.time() - start_time) / 60 >= job_timeout_minutes:
