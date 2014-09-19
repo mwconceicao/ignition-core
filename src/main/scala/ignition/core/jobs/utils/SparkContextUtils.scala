@@ -59,23 +59,22 @@ object SparkContextUtils {
     // This function will expand the paths then group they and give to RDDs
     // We group to avoid too many RDDs on union (each RDD take some memory on driver)
     // We avoid passing a path too big to one RDD to avoid a Hadoop bug where just part of the path is processed when the path is big
-    private def processPaths(f: (String) => RDD[String], initialPaths: Seq[String]): RDD[String] = {
-      require(initialPaths.nonEmpty)
+    private def processPaths(f: (String) => RDD[String], initialPaths: Seq[String], minimumPaths: Int): RDD[String] = {
       val processedPaths = for {
         p <- initialPaths
         nonEmptyPath <- nonEmptyFilesPath(p, failOnEmpty = false)
       } yield nonEmptyPath
 
-      if (processedPaths.isEmpty)
-        throw new Exception(s"No path with files found for $initialPaths")
+      if (processedPaths.size < minimumPaths)
+        throw new Exception(s"Not enough paths found for $initialPaths")
 
       val rdds = processedPaths.grouped(50).map(pathGroup => f(pathGroup.mkString(",")))
 
-      rdds.reduce(_ union _)
+      rdds.fold(sc.parallelize(Seq.empty))(_ union _)
     }
 
-    private def nonEmptyTextFile(paths: Seq[String]): RDD[String] = {
-      processPaths((p) => sc.textFile(p), paths)
+    private def nonEmptyTextFile(paths: Seq[String], minimumPaths: Int): RDD[String] = {
+      processPaths((p) => sc.textFile(p), paths, minimumPaths)
     }
 
     private def filterPaths(path: String,
@@ -135,7 +134,7 @@ object SparkContextUtils {
       }
       // We delete first because we may have two paths in the same parent
       mapPaths((p, hdfsPath) => delete(new Path(hdfsPath).getParent))// delete parent to avoid old files being accumulated
-      mapPaths((p, hdfsPath) => nonEmptyTextFile(Seq(p)).coalesce(sc.defaultParallelism, true).saveAsTextFile(hdfsPath))
+      mapPaths((p, hdfsPath) => nonEmptyTextFile(Seq(p), 0).coalesce(sc.defaultParallelism, true).saveAsTextFile(hdfsPath))
     }
 
     def filterAndGetTextFiles(path: String,
@@ -145,31 +144,33 @@ object SparkContextUtils {
                               lastN: Option[Int] = None,
                               synchLocally: Boolean = false,
                               forceSynch: Boolean = false,
-                              ignoreMalformedDates: Boolean = false): RDD[String] = {
+                              ignoreMalformedDates: Boolean = false,
+                              minimumPaths: Int = 1): RDD[String] = {
       val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN, ignoreMalformedDates)
-      if (paths.isEmpty)
+      if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else if (synchLocally)
-        nonEmptyTextFile(synchToHdfs(paths, forceSynch))
+        nonEmptyTextFile(synchToHdfs(paths, forceSynch), minimumPaths)
       else
-        nonEmptyTextFile(paths)
+        nonEmptyTextFile(paths, minimumPaths)
     }
 
-    private def stringHadoopFile(paths: Seq[String]): RDD[String] = {
+    private def stringHadoopFile(paths: Seq[String], minimumPaths: Int): RDD[String] = {
       processPaths((p) => sc.sequenceFile(p, classOf[LongWritable], classOf[org.apache.hadoop.io.BytesWritable])
-                .map({ case (k, v) => new String(v.getBytes) }), paths)
+                .map({ case (k, v) => new String(v.getBytes) }), paths, minimumPaths)
     }
 
     def filterAndGetStringHadoopFiles(path: String, requireSuccess: Boolean = false,
                                       startDate: Option[DateTime] = None,
                                       endDate: Option[DateTime] = None,
                                       lastN: Option[Int] = None,
-                                      ignoreMalformedDates: Boolean = false): RDD[String] = {
+                                      ignoreMalformedDates: Boolean = false,
+                                      minimumPaths: Int = 1): RDD[String] = {
       val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN, ignoreMalformedDates)
-      if (paths.isEmpty)
+      if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else
-        stringHadoopFile(paths)
+        stringHadoopFile(paths, minimumPaths)
     }
   }
 }
