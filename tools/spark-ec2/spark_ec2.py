@@ -26,6 +26,7 @@ import os
 import pipes
 import random
 import shutil
+import string
 import subprocess
 import sys
 import tempfile
@@ -34,7 +35,7 @@ import urllib2
 from optparse import OptionParser
 from sys import stderr
 import boto
-from boto.ec2.blockdevicemapping import BlockDeviceMapping, EBSBlockDeviceType
+from boto.ec2.blockdevicemapping import BlockDeviceMapping, BlockDeviceType, EBSBlockDeviceType
 from boto import ec2
 
 # A URL prefix from which to fetch AMI information
@@ -83,7 +84,7 @@ def parse_args():
              "between zones applies)")
     parser.add_option("-a", "--ami", help="Amazon Machine Image ID to use")
     parser.add_option(
-        "-v", "--spark-version", default="1.0.0",
+        "-v", "--spark-version", default="1.1.0",
         help="Version of Spark to use: 'X.Y.Z' or a specific git hash")
     parser.add_option(
         "--spark-git-repo",
@@ -124,7 +125,7 @@ def parse_args():
         help="The SSH user you want to connect as (default: root)")
     parser.add_option(
         "--delete-groups", action="store_true", default=False,
-        help="When destroying a cluster, delete the security groups that were created.")
+        help="When destroying a cluster, delete the security groups that were created")
     parser.add_option(
         "--use-existing-master", action="store_true", default=False,
         help="Launch fresh slaves, but use an existing stopped master if possible")
@@ -202,8 +203,10 @@ def is_active(instance):
 
 # Return correct versions of Spark and Shark, given the supplied Spark version
 def get_spark_shark_version(opts):
-    spark_shark_map = {"0.7.3": "0.7.1", "0.8.0": "0.8.0", "0.8.1": "0.8.1", "0.9.0": "0.9.0",
-        "0.9.1": "0.9.1", "1.0.0": "1.0.0", "1.0.1": "1.0.0", "1.0.2": "1.0.0"}
+    spark_shark_map = {
+        "0.7.3": "0.7.1", "0.8.0": "0.8.0", "0.8.1": "0.8.1", "0.9.0": "0.9.0", "0.9.1": "0.9.1",
+        "1.0.0": "1.0.0", "1.0.1": "1.0.1", "1.0.2": "1.0.2", "1.1.0": "1.1.0"
+    }
     version = opts.spark_version.replace("v", "")
     if version not in spark_shark_map:
         print >> stderr, "Don't know about Spark version: %s" % version
@@ -232,10 +235,10 @@ def get_spark_ami(opts):
         "cg1.4xlarge": "hvm",
         "hs1.8xlarge": "pvm",
         "hi1.4xlarge": "pvm",
-        "m3.medium":   "pvm",
-        "m3.large":    "pvm",
-        "m3.xlarge":   "pvm",
-        "m3.2xlarge":  "pvm",
+        "m3.medium":   "hvm",
+        "m3.large":    "hvm",
+        "m3.xlarge":   "hvm",
+        "m3.2xlarge":  "hvm",
         "cr1.8xlarge": "hvm",
         "i2.xlarge":   "hvm",
         "i2.2xlarge":  "hvm",
@@ -353,6 +356,15 @@ def launch_cluster(conn, opts, cluster_name):
         device.size = opts.ebs_vol_size
         device.delete_on_termination = True
         block_map["/dev/sdv"] = device
+
+    # AWS ignores the AMI-specified block device mapping for M3 (see SPARK-3342).
+    if opts.instance_type.startswith('m3.'):
+        for i in range(get_num_disks(opts.instance_type)):
+            dev = BlockDeviceType()
+            dev.ephemeral_name = 'ephemeral%d' % i
+            # The first ephemeral drive is /dev/sdb.
+            name = '/dev/sd' + string.letters[i + 1]
+            block_map[name] = dev
 
     # Launch slaves
     if opts.spot_price is not None:

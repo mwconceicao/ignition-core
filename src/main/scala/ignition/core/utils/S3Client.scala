@@ -33,16 +33,16 @@ class S3Client {
   }
 
   def readContent(bucket: String, key: String): S3Object = {
-    service.getObject(new S3Bucket(bucket), key)
+    service.getObject(bucket, key, null, null, null, null, null, null)
   }
 
   def list(bucket: String, key: String): Array[S3Object] = {
-    service.listObjects(new S3Bucket(bucket), key, null)
+    service.listObjects(bucket, key, "/", 99999L)
   }
 
   def fileExists(bucket: String, key: String): Boolean = {
     try {
-      service.getObjectDetails(new S3Bucket(bucket), key)
+      service.getObjectDetails(bucket, key, null, null, null, null)
       true
     } catch {
       case e: org.jets3t.service.S3ServiceException if e.getResponseCode == 404 => false
