@@ -34,7 +34,7 @@ libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.6"
 
 libraryDependencies += "com.github.scopt" %% "scopt" % "3.2.0"
 
-libraryDependencies += "net.java.dev.jets3t" % "jets3t" % "0.7.0"
+libraryDependencies += "net.java.dev.jets3t" % "jets3t" % "0.7.1"
 
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 
