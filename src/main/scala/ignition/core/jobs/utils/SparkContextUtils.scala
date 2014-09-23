@@ -1,11 +1,14 @@
 package ignition.core.jobs.utils
 
+import java.util.Date
+
 import org.apache.hadoop.io.LongWritable
 import org.apache.spark.SparkContext
 import org.apache.hadoop.fs.{FileStatus, Path, FileSystem}
 import org.apache.spark.rdd.RDD
 import org.joda.time.{DateTimeZone, DateTime}
 
+import scala.reflect.ClassTag
 import scala.util.Try
 
 
@@ -135,6 +138,15 @@ object SparkContextUtils {
       // We delete first because we may have two paths in the same parent
       mapPaths((p, hdfsPath) => delete(new Path(hdfsPath).getParent))// delete parent to avoid old files being accumulated
       mapPaths((p, hdfsPath) => nonEmptyTextFile(Seq(p), 0).coalesce(sc.defaultParallelism, true).saveAsTextFile(hdfsPath))
+    }
+
+
+    def prepareRDDForMultipleReads[V: ClassTag](rdd: RDD[V], deleteOld: Boolean = true): RDD[V] = {
+      val path = s"${hdfsPathPrefix}rddsForMultipleReads/${new Date().getTime()}"
+      if (deleteOld)
+        delete(new Path(path).getParent)
+      rdd.saveAsObjectFile(path)
+      sc.objectFile[V](path)
     }
 
     def filterAndGetTextFiles(path: String,

@@ -65,7 +65,8 @@ object CoreJobRunner {
       sparkConf.set("spark.shuffle.memoryFraction", "0.3")
       sparkConf.set("spark.storage.memoryFraction", "0.3")
       sparkConf.set("spark.reducer.maxMbInFlight", "10")
-
+      sparkConf.set("spark.shuffle.manager", "SORT")
+      sparkConf.set("spark.hadoop.validateOutputSpecs", "true")
 
       val sc = new SparkContext(sparkConf)
 
