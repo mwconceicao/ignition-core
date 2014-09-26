@@ -169,7 +169,7 @@ object SparkContextUtils {
 
     private def stringHadoopFile(paths: Seq[String], minimumPaths: Int): RDD[String] = {
       processPaths((p) => sc.sequenceFile(p, classOf[LongWritable], classOf[org.apache.hadoop.io.BytesWritable])
-                .map({ case (k, v) => new String(v.getBytes) }), paths, minimumPaths)
+                .map({ case (k, v) => new String(v.getBytes, 0, v.getLength) }), paths, minimumPaths)
     }
 
     def filterAndGetStringHadoopFiles(path: String, requireSuccess: Boolean = false,
