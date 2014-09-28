@@ -124,7 +124,7 @@ object SparkContextUtils {
 
     lazy val hdfsPathPrefix = sc.master.replaceFirst("spark://(.*):7077", "hdfs://$1:9000/")
 
-    def synchToHdfs(paths: Seq[String], forceSynch: Boolean): Seq[String] = {
+    def synchToHdfs(paths: Seq[String], pathsToRdd: (Seq[String], Int) => RDD[String], forceSynch: Boolean): Seq[String] = {
       def mapPaths(actionWhenNeedsSynching: (String, String) => Unit): Seq[String] = {
         paths.map(p => {
           val hdfsPath = p.replace("s3n://", hdfsPathPrefix)
@@ -137,7 +137,7 @@ object SparkContextUtils {
       }
       // We delete first because we may have two paths in the same parent
       mapPaths((p, hdfsPath) => delete(new Path(hdfsPath).getParent))// delete parent to avoid old files being accumulated
-      mapPaths((p, hdfsPath) => nonEmptyTextFile(Seq(p), 0).coalesce(sc.defaultParallelism, true).saveAsTextFile(hdfsPath))
+      mapPaths((p, hdfsPath) => pathsToRdd(Seq(p), 0).coalesce(sc.defaultParallelism, true).saveAsTextFile(hdfsPath))
     }
 
 
@@ -162,7 +162,7 @@ object SparkContextUtils {
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else if (synchLocally)
-        nonEmptyTextFile(synchToHdfs(paths, forceSynch), minimumPaths)
+        nonEmptyTextFile(synchToHdfs(paths, nonEmptyTextFile, forceSynch), minimumPaths)
       else
         nonEmptyTextFile(paths, minimumPaths)
     }
@@ -176,11 +176,15 @@ object SparkContextUtils {
                                       startDate: Option[DateTime] = None,
                                       endDate: Option[DateTime] = None,
                                       lastN: Option[Int] = None,
+                                      synchLocally: Boolean = false,
+                                      forceSynch: Boolean = false,
                                       ignoreMalformedDates: Boolean = false,
                                       minimumPaths: Int = 1): RDD[String] = {
       val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
+      else if (synchLocally) // we save locally as text file, so read as text files
+        nonEmptyTextFile(synchToHdfs(paths, stringHadoopFile, forceSynch), minimumPaths)
       else
         stringHadoopFile(paths, minimumPaths)
     }
