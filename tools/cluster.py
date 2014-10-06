@@ -435,7 +435,7 @@ def job_run(cluster_name, job_name, job_mem,
                 log.exception("Failed to kill failed job (probably it's already dead)")
         if destroy_cluster:
             log.info('Destroying cluster as requested')
-            destroy(cluster_name)
+            destroy(cluster_name, region=region)
         if failed:
             raise failed_exception or Exception('Failed!?')
     return (job_name, job_tag)
@@ -530,11 +530,11 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
     def collect(show_tail):
         try:
             dest_log_dir = collect_job_results(cluster_name=cluster_name,
-                                            job_name=job_name, job_tag=job_tag,
-                                            key_file=key_file,
-                                            master=master, remote_user=remote_user,
-                                            remote_control_dir=remote_control_dir,
-                                            collect_results_dir=collect_results_dir)
+                                               job_name=job_name, job_tag=job_tag,
+                                               key_file=key_file, region=region,
+                                               master=master, remote_user=remote_user,
+                                               remote_control_dir=remote_control_dir,
+                                               collect_results_dir=collect_results_dir)
             log.info('Jobs results saved on: {}'.format(dest_log_dir))
             if show_tail:
                 output_log = os.path.join(dest_log_dir, 'output.log')
