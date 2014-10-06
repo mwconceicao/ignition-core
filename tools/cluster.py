@@ -406,6 +406,7 @@ def job_run(cluster_name, job_name, job_mem,
         try:
             wait_for_job(cluster_name=cluster_name, job_name=job_name,
                          job_tag=job_tag, key_file=key_file, master=master,
+                         region=region,
                          job_timeout_minutes=job_timeout_minutes,
                          remote_user=remote_user, remote_control_dir=remote_control_dir,
                          collect_results_dir=collect_results_dir)
@@ -593,7 +594,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                 log.warn('Received unexpected response while checking job status: {}'.format(output))
                 failures += 1
                 last_failure = 'Unexpected response: {}'.format(output)
-            health_check(cluster_name=cluster_name, key_file=key_file, master=master, remote_user=remote_user)
+            health_check(cluster_name=cluster_name, key_file=key_file, master=master, remote_user=remote_user, region=region)
         except subprocess.CalledProcessError as e:
             failures += 1
             log.exception('Got exception')
