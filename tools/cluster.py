@@ -580,7 +580,7 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                     ['ps', 'auxef']
                 ]
                 log.info('Will run some commands for posterior investigation of the problem')
-                for command in commmands:
+                for command in commands:
                     ssh_call(user=remote_user, host=master, key_file=key_file, args=command)
                 failures += 1
                 last_failure = 'Control missing'
