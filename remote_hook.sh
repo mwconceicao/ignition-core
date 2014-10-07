@@ -14,7 +14,12 @@ NOTIFY_ON_ERRORS="${8?Please tell if we will notify on errors (yes/no)}"
 
 JOB_WITH_TAG=${JOB_NAME}.${JOB_TAG}
 JOB_CONTROL_DIR="${CONTROL_DIR}/${JOB_WITH_TAG}"
-mkdir -p "${JOB_CONTROL_DIR}"
+MY_USER=$(whoami)
+
+# Avoids problems when another user created our control dir
+sudo mkdir -p "${JOB_CONTROL_DIR}"
+sudo chown $MY_USER "${JOB_CONTROL_DIR}"
+
 
 RUNNING_FILE="${JOB_CONTROL_DIR}/RUNNING"
 echo $$ > "${RUNNING_FILE}"
