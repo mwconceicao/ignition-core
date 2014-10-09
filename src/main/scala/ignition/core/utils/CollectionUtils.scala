@@ -60,6 +60,9 @@ object CollectionUtils {
     def isBlank: Boolean = {
       opt.isEmpty || opt.get.trim.isEmpty
     }
+
+    def nonBlank: Boolean = !opt.isBlank
+
     def noneIfBlank: Option[String] = {
       if (opt.isBlank) None else opt
     }
