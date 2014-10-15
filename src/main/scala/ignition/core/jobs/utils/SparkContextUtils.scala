@@ -81,8 +81,10 @@ object SparkContextUtils {
     }
 
     private def filterPaths(path: String,
-                            requireSuccess: Boolean = false,
+                            requireSuccess: Boolean,
+                            inclusiveStartDate: Boolean,
                             startDate: Option[DateTime],
+                            inclusiveEndDate: Boolean,
                             endDate: Option[DateTime],
                             lastN: Option[Int],
                             ignoreMalformedDates: Boolean): Seq[String] = {
@@ -96,8 +98,8 @@ object SparkContextUtils {
             false
           else {
             val date = tryDate.get
-            val goodStartDate = startDate.isEmpty || date.withZone(DateTimeZone.UTC).equals(startDate.get.withZone(DateTimeZone.UTC)) || date.isAfter(startDate.get)
-            val goodEndDate = endDate.isEmpty || date.withZone(DateTimeZone.UTC).equals(endDate.get.withZone(DateTimeZone.UTC)) || date.isBefore(endDate.get)
+            val goodStartDate = startDate.isEmpty || (inclusiveStartDate && date.withZone(DateTimeZone.UTC).equals(startDate.get.withZone(DateTimeZone.UTC))) || date.isAfter(startDate.get)
+            val goodEndDate = endDate.isEmpty || (inclusiveEndDate && date.withZone(DateTimeZone.UTC).equals(endDate.get.withZone(DateTimeZone.UTC))) || date.isBefore(endDate.get)
             goodStartDate && goodEndDate
           }
         })
@@ -113,12 +115,14 @@ object SparkContextUtils {
 
     def getFilteredPaths(path: String,
                          requireSuccess: Boolean,
+                         inclusiveStartDate: Boolean,
                          startDate: Option[DateTime],
+                         inclusiveEndDate: Boolean,
                          endDate: Option[DateTime],
                          lastN: Option[Int],
                          ignoreMalformedDates: Boolean): Seq[String] = {
       require(lastN.isEmpty || endDate.isDefined, "If you are going to get the last files, better specify the end date to avoid getting files in the future")
-      filterPaths(path, requireSuccess, startDate, endDate, lastN, ignoreMalformedDates)
+      filterPaths(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
     }
 
 
@@ -151,14 +155,16 @@ object SparkContextUtils {
 
     def filterAndGetTextFiles(path: String,
                               requireSuccess: Boolean = false,
+                              inclusiveStartDate: Boolean = true,
                               startDate: Option[DateTime] = None,
+                              inclusiveEndDate: Boolean = true,
                               endDate: Option[DateTime] = None,
                               lastN: Option[Int] = None,
                               synchLocally: Boolean = false,
                               forceSynch: Boolean = false,
                               ignoreMalformedDates: Boolean = false,
                               minimumPaths: Int = 1): RDD[String] = {
-      val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN, ignoreMalformedDates)
+      val paths = getFilteredPaths(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else if (synchLocally)
@@ -172,15 +178,18 @@ object SparkContextUtils {
                 .map({ case (k, v) => new String(v.getBytes, 0, v.getLength) }), paths, minimumPaths)
     }
 
-    def filterAndGetStringHadoopFiles(path: String, requireSuccess: Boolean = false,
+    def filterAndGetStringHadoopFiles(path: String,
+                                      requireSuccess: Boolean = false,
+                                      inclusiveStartDate: Boolean = true,
                                       startDate: Option[DateTime] = None,
+                                      inclusiveEndDate: Boolean = true,
                                       endDate: Option[DateTime] = None,
                                       lastN: Option[Int] = None,
                                       synchLocally: Boolean = false,
                                       forceSynch: Boolean = false,
                                       ignoreMalformedDates: Boolean = false,
                                       minimumPaths: Int = 1): RDD[String] = {
-      val paths = getFilteredPaths(path, requireSuccess, startDate, endDate, lastN, ignoreMalformedDates)
+      val paths = getFilteredPaths(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else if (synchLocally) // we save locally as text file, so read as text files
