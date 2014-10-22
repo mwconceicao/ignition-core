@@ -66,6 +66,7 @@ object CoreJobRunner {
       sparkConf.set("spark.storage.memoryFraction", "0.3")
       sparkConf.set("spark.reducer.maxMbInFlight", "10")
       sparkConf.set("spark.hadoop.validateOutputSpecs", "true")
+      sparkConf.set("spark.storage.blockManagerSlaveTimeoutMs", "120000")
       //sparkConf.set("spark.shuffle.spill.compress", "false")
 
 
