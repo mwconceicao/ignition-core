@@ -67,6 +67,7 @@ object CoreJobRunner {
       sparkConf.set("spark.reducer.maxMbInFlight", "10")
       sparkConf.set("spark.hadoop.validateOutputSpecs", "true")
       sparkConf.set("spark.storage.blockManagerSlaveTimeoutMs", "120000")
+      sparkConf.set("spark.core.connection.ack.wait.timeout", "600")
       //sparkConf.set("spark.shuffle.spill.compress", "false")
 
 
