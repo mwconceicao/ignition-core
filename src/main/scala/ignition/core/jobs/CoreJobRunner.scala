@@ -60,7 +60,7 @@ object CoreJobRunner {
       sparkConf.set("spark.logConf", "true")
       sparkConf.set("spark.executor.extraJavaOptions", "-Djava.io.tmpdir=/mnt -verbose:gc -XX:-PrintGCDetails -XX:+PrintGCTimeStamps -XX:-UseGCOverheadLimit")
       sparkConf.set("spark.speculation", "true")
-      sparkConf.set("spark.akka.frameSize", "15")
+      sparkConf.set("spark.akka.frameSize", "150")
       sparkConf.set("spark.default.parallelism", "640")
       sparkConf.set("spark.shuffle.memoryFraction", "0.2")
       sparkConf.set("spark.storage.memoryFraction", "0.3")
