@@ -73,7 +73,7 @@ object SparkContextUtils {
 
       val rdds = processedPaths.grouped(50).map(pathGroup => f(pathGroup.mkString(",")))
 
-      new UnionRDD(sc, rdds.toArray)
+      new UnionRDD(sc, rdds.toList)
     }
 
     private def nonEmptyTextFile(paths: Seq[String], minimumPaths: Int): RDD[String] = {
