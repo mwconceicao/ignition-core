@@ -11,7 +11,7 @@ import org.jets3t.service.{Constants, Jets3tProperties}
 class S3Client {
 
   val jets3tProperties = {
-    val jets3tProperties = Jets3tProperties.getInstance(Constants.JETS3T_PROPERTIES_FILENAME);
+    val jets3tProperties = Jets3tProperties.getInstance(Constants.JETS3T_PROPERTIES_FILENAME)
     val properties = new Properties()
 //    properties.put("httpclient.max-connections", "2") // The maximum number of simultaneous connections to allow globally
 //    properties.put("httpclient.retry-max", "10") // How many times to retry connections when they fail with IO errors

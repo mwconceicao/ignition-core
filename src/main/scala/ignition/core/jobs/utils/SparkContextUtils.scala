@@ -5,7 +5,7 @@ import java.util.Date
 import org.apache.hadoop.io.LongWritable
 import org.apache.spark.SparkContext
 import org.apache.hadoop.fs.{FileStatus, Path, FileSystem}
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{UnionRDD, RDD}
 import org.joda.time.{DateTimeZone, DateTime}
 
 import scala.reflect.ClassTag
@@ -73,7 +73,7 @@ object SparkContextUtils {
 
       val rdds = processedPaths.grouped(50).map(pathGroup => f(pathGroup.mkString(",")))
 
-      rdds.fold(sc.parallelize(Seq.empty))(_ union _)
+      new UnionRDD(sc, rdds.toArray)
     }
 
     private def nonEmptyTextFile(paths: Seq[String], minimumPaths: Int): RDD[String] = {
