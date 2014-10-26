@@ -26,7 +26,7 @@ object SparkContextUtils {
       for {
         path <- paths
         status <- Option(fs.globStatus(path)).getOrElse(Array.empty).toSeq
-        if status.isDirectory || !removeEmpty || status.getLen > 0 // remove empty files if necessary
+        if status.isDir || !removeEmpty || status.getLen > 0 // remove empty files if necessary
       } yield status
     }
 
@@ -42,41 +42,19 @@ object SparkContextUtils {
       paths.flatMap(p => getStatus(p, removeEmpty)).map(_.getPath.toString).distinct.sorted
     }
 
-    // This method's purpose is to skip empty files on a given path (to work around the fact that empty files gives errors to hadoop)
-    // if the path expands only to files, it will just filter out the empty ones
-    // if it expands to a directory, then it will get all non empty files from this directory (but will ignore subdirectories)
-    def nonEmptyFilesPath(path: String, failOnEmpty: Boolean = true): Set[String] = {
-      // getStatus only get non empty files
-      val status = getStatus(path, removeEmpty = true)
-      val (dirs, files) = status.partition(f => f.isDirectory)
-      val filesFromDirs = dirs.flatMap(dir => getStatus(dir.getPath.toString + "/*", removeEmpty = true)).filter(p => p.isFile)
-      val finalFilesStatus = files.filter(_.isFile) ++ filesFromDirs
-      val finalFiles = finalFilesStatus.map(_.getPath.toString).toSet
-
-      if (failOnEmpty && finalFiles.isEmpty)
-        throw new Exception(s"Zero non-empty files matched by: $path")
-
-      finalFiles
-    }
-
     // This function will expand the paths then group they and give to RDDs
     // We group to avoid too many RDDs on union (each RDD take some memory on driver)
     // We avoid passing a path too big to one RDD to avoid a Hadoop bug where just part of the path is processed when the path is big
-    private def processPaths(f: (String) => RDD[String], initialPaths: Seq[String], minimumPaths: Int): RDD[String] = {
-      val processedPaths = for {
-        p <- initialPaths
-        nonEmptyPath <- nonEmptyFilesPath(p, failOnEmpty = false)
-      } yield nonEmptyPath
+    private def processPaths(f: (String) => RDD[String], paths: Seq[String], minimumPaths: Int): RDD[String] = {
+      if (paths.size < minimumPaths)
+        throw new Exception(s"Not enough paths found for $paths")
 
-      if (processedPaths.size < minimumPaths)
-        throw new Exception(s"Not enough paths found for $initialPaths")
-
-      val rdds = processedPaths.grouped(50).map(pathGroup => f(pathGroup.mkString(",")))
+      val rdds = paths.grouped(50).map(pathGroup => f(pathGroup.mkString(",")))
 
       new UnionRDD(sc, rdds.toList)
     }
 
-    private def nonEmptyTextFile(paths: Seq[String], minimumPaths: Int): RDD[String] = {
+    private def processTextFiles(paths: Seq[String], minimumPaths: Int): RDD[String] = {
       processPaths((p) => sc.textFile(p), paths, minimumPaths)
     }
 
@@ -132,7 +110,7 @@ object SparkContextUtils {
       def mapPaths(actionWhenNeedsSynching: (String, String) => Unit): Seq[String] = {
         paths.map(p => {
           val hdfsPath = p.replace("s3n://", hdfsPathPrefix)
-          if (forceSynch || getStatus(hdfsPath, false).isEmpty || getStatus(s"$hdfsPath/*", true).filter(_.isFile).size != sc.defaultParallelism) {
+          if (forceSynch || getStatus(hdfsPath, false).isEmpty || getStatus(s"$hdfsPath/*", true).filterNot(_.isDir).size != sc.defaultParallelism) {
             val _hdfsPath = new Path(hdfsPath)
             actionWhenNeedsSynching(p, hdfsPath)
           }
@@ -168,9 +146,9 @@ object SparkContextUtils {
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else if (synchLocally)
-        nonEmptyTextFile(synchToHdfs(paths, nonEmptyTextFile, forceSynch), minimumPaths)
+        processTextFiles(synchToHdfs(paths, processTextFiles, forceSynch), minimumPaths)
       else
-        nonEmptyTextFile(paths, minimumPaths)
+        processTextFiles(paths, minimumPaths)
     }
 
     private def stringHadoopFile(paths: Seq[String], minimumPaths: Int): RDD[String] = {
@@ -193,7 +171,7 @@ object SparkContextUtils {
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else if (synchLocally) // we save locally as text file, so read as text files
-        nonEmptyTextFile(synchToHdfs(paths, stringHadoopFile, forceSynch), minimumPaths)
+        processTextFiles(synchToHdfs(paths, stringHadoopFile, forceSynch), minimumPaths)
       else
         stringHadoopFile(paths, minimumPaths)
     }

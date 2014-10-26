@@ -52,10 +52,14 @@ object CoreJobRunner {
         s"Invalid job setup ${config.setupName}, available jobs setups: ${jobsSetups.keySet}")
 
       val appName = s"${config.setupName}.${config.tag}"
-      val sparkConf = new SparkConf()
+
+
+      val sc = new SparkContext(config.master, appName)
+      val sparkConf = sc.getConf
+//      val sparkConf = new SparkConf
       sparkConf.setMaster(config.master)
       sparkConf.setAppName(appName)
-      sparkConf.setJars(SparkContext.jarOfClass(this.getClass).toSeq)
+      //sparkConf.setJars(SparkContext.jarOfClass(this.getClass).toSeq)
       sparkConf.set("spark.executor.memory", config.executorMemory)
       sparkConf.set("spark.logConf", "true")
       sparkConf.set("spark.executor.extraJavaOptions", "-Djava.io.tmpdir=/mnt -verbose:gc -XX:-PrintGCDetails -XX:+PrintGCTimeStamps -XX:-UseGCOverheadLimit")
@@ -72,7 +76,8 @@ object CoreJobRunner {
       //sparkConf.set("spark.shuffle.spill.compress", "false")
 
 
-      val sc = new SparkContext(sparkConf)
+//      val sc = new SparkContext(sparkConf)
+
 
       val context = RunnerContext(sc, config)
 
