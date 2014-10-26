@@ -46,10 +46,11 @@ object SparkContextUtils {
     // We group to avoid too many RDDs on union (each RDD take some memory on driver)
     // We avoid passing a path too big to one RDD to avoid a Hadoop bug where just part of the path is processed when the path is big
     private def processPaths(f: (String) => RDD[String], paths: Seq[String], minimumPaths: Int): RDD[String] = {
-      if (paths.size < minimumPaths)
+      val splittedPaths = paths.flatMap(ignition.core.utils.HadoopUtils.getPathStrings)
+      if (splittedPaths.size < minimumPaths)
         throw new Exception(s"Not enough paths found for $paths")
 
-      val rdds = paths.grouped(50).map(pathGroup => f(pathGroup.mkString(",")))
+      val rdds = splittedPaths.grouped(50).map(pathGroup => f(pathGroup.mkString(",")))
 
       new UnionRDD(sc, rdds.toList)
     }

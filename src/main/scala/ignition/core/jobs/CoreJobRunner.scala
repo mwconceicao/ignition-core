@@ -54,8 +54,7 @@ object CoreJobRunner {
       val appName = s"${config.setupName}.${config.tag}"
 
 
-      val sc = new SparkContext(config.master, appName)
-      val sparkConf = sc.getConf
+      val sparkConf = new SparkConf
 //      val sparkConf = new SparkConf
       sparkConf.setMaster(config.master)
       sparkConf.setAppName(appName)
@@ -71,12 +70,11 @@ object CoreJobRunner {
       sparkConf.set("spark.reducer.maxMbInFlight", "15")
       sparkConf.set("spark.hadoop.validateOutputSpecs", "true")
       //sparkConf.set("spark.storage.blockManagerSlaveTimeoutMs", "120000")
-      sparkConf.set("spark.eventLog.enabled", "true")
+//      sparkConf.set("spark.eventLog.enabled", "true") // not supported on 1.0.2
       //sparkConf.set("spark.core.connection.ack.wait.timeout", "600")
       //sparkConf.set("spark.shuffle.spill.compress", "false")
 
-
-//      val sc = new SparkContext(sparkConf)
+      val sc = new SparkContext(sparkConf)
 
 
       val context = RunnerContext(sc, config)
