@@ -44,6 +44,7 @@ default_zone = default_region + 'b'
 default_key_id = 'ignition_key'
 default_key_file = os.path.expanduser('~/.ssh/ignition_key.pem')
 default_ami = 'ami-35b1885c'  # HVM AMI
+default_master_ami = 'ami-5bb18832'  # PVM AMI
 default_env = 'dev'
 default_spark_version = '1.0.2'
 default_remote_user = 'ec2-user'
@@ -208,7 +209,8 @@ def launch(cluster_name, slaves,
            script_timeout_total_minutes=55,
            script_timeout_inactivity_minutes=10,
            resume=False, just_ignore_existing=False, worker_timeout=240,
-           spark_version=default_spark_version, ami=default_ami):
+           spark_version=default_spark_version,
+           ami=default_ami, master_ami=default_master_ami):
 
     all_args = locals()
 
@@ -235,6 +237,7 @@ def launch(cluster_name, slaves,
             log.info('Running script, try %d of %d', i + 1, retries_on_same_cluster)
             try:
                 call_ec2_script(['--ami', ami,
+                                 '--master-ami', master_ami,
                                  '--identity-file', key_file,
                                  '--key-pair', key_id,
                                  '--slaves', slaves,

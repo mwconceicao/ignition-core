@@ -83,6 +83,7 @@ def parse_args():
              "slaves across multiple (an additional $0.01/Gb for bandwidth" +
              "between zones applies)")
     parser.add_option("-a", "--ami", help="Amazon Machine Image ID to use")
+    parser.add_option("--master-ami", help="Amazon Machine Image ID to use for the Master")
     parser.add_option(
         "-v", "--spark-version", default="1.1.0",
         help="Version of Spark to use: 'X.Y.Z' or a specific git hash")
@@ -335,6 +336,10 @@ def launch_cluster(conn, opts, cluster_name):
     if opts.ami is None:
         opts.ami = get_spark_ami(opts)
 
+    if opts.master_ami is None:
+        opts.master_ami = opts.ami
+
+
 
     additional_groups = []
     if opts.additional_security_group:
@@ -348,6 +353,12 @@ def launch_cluster(conn, opts, cluster_name):
     except:
         print >> stderr, "Could not find AMI " + opts.ami
         sys.exit(1)
+    try:
+        master_image = conn.get_all_images(image_ids=[opts.master_ami])[0]
+    except:
+        print >> stderr, "Could not find AMI " + opts.master_ami
+        sys.exit(1)
+
 
     # Create block device mapping so that we can add an EBS volume if asked to
     block_map = BlockDeviceMapping()
@@ -462,7 +473,7 @@ def launch_cluster(conn, opts, cluster_name):
             master_type = opts.instance_type
         if opts.zone == 'all':
             opts.zone = random.choice(conn.get_all_zones()).name
-        master_res = image.run(key_name=opts.key_pair,
+        master_res = master_image.run(key_name=opts.key_pair,
                                security_groups=[master_group] + additional_groups,
                                instance_type=master_type,
                                placement=opts.zone,
