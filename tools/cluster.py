@@ -197,7 +197,7 @@ def launch(cluster_name, slaves,
            tag=[],
            key_id=default_key_id, region=default_region,
            zone=default_zone, instance_type=default_instance_type,
-           spot_price=default_spot_price,
+           ondemand=False, spot_price=default_spot_price,
            user_data=default_user_data,
            security_group = None,
            master_instance_type=default_master_instance_type,
@@ -233,6 +233,9 @@ def launch(cluster_name, slaves,
                 '--additional-security-group', security_group
             ])
 
+        spot_params = ['--spot-price', spot_price]
+        if ondemand:
+            spot_params = []
         for i in range(retries_on_same_cluster):
             log.info('Running script, try %d of %d', i + 1, retries_on_same_cluster)
             try:
@@ -241,7 +244,6 @@ def launch(cluster_name, slaves,
                                  '--identity-file', key_file,
                                  '--key-pair', key_id,
                                  '--slaves', slaves,
-                                 '--spot-price', spot_price,
                                  '--region', region,
                                  '--zone', zone,
                                  '--instance-type', instance_type,
@@ -253,10 +255,11 @@ def launch(cluster_name, slaves,
                                  '-v', spark_version,
                                  '--user-data', user_data,
                                  'launch', cluster_name] +
-                                     resume_param +
-                                     auth_params,
-                                     timeout_total_minutes=script_timeout_total_minutes,
-                                     timeout_inactivity_minutes=script_timeout_inactivity_minutes)
+                                spot_params +
+                                resume_param +
+                                auth_params,
+                                timeout_total_minutes=script_timeout_total_minutes,
+                                timeout_inactivity_minutes=script_timeout_inactivity_minutes)
                 success = True
             except subprocess.CalledProcessError as e:
                 resume_param = ['--resume']
