@@ -36,8 +36,17 @@ object CollectionUtils {
       })
     }
   }
-  implicit class ValidatedSeqCollection[A, B](seq: Seq[Validation[A, B]]) {
 
+  implicit class ValidatedListCollection[A, B](seq: List[Validation[A, B]]) {
+    def mapSuccess(f: B => Validation[A, B]): List[Validation[A, B]] = {
+      seq.map({
+        case Success(v) => f(v)
+        case failure => failure
+      })
+    }
+  }
+
+  implicit class ValidatedSeqCollection[A, B](seq: Seq[Validation[A, B]]) {
     def mapSuccess(f: B => Validation[A, B]): Seq[Validation[A, B]] = {
       seq.map({
         case Success(v) => f(v)
