@@ -65,7 +65,7 @@ object CoreJobRunner {
       sparkConf.set("spark.speculation", "true")
       sparkConf.set("spark.akka.frameSize", "50")
       //sparkConf.set("spark.default.parallelism", "30000")
-      sparkConf.set("spark.shuffle.memoryFraction", "0.2")
+      sparkConf.set("spark.shuffle.memoryFraction", "0.0")
       sparkConf.set("spark.storage.memoryFraction", "0.3")
       sparkConf.set("spark.reducer.maxMbInFlight", "15")
       sparkConf.set("spark.hadoop.validateOutputSpecs", "true")
