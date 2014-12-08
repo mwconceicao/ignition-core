@@ -56,7 +56,8 @@ object SparkContextUtils {
     }
 
     private def processTextFiles(paths: Seq[String], minimumPaths: Int): RDD[String] = {
-      processPaths((p) => sc.textFile(p), paths, minimumPaths)
+      val minPartitions = 256 // FIXME: work around some buggy hadoop clients versions which don't split at all
+      processPaths((p) => sc.textFile(p, minPartitions), paths, minimumPaths)
     }
 
     private def filterPaths(path: String,
