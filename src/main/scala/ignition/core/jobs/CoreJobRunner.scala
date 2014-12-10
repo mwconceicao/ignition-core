@@ -3,6 +3,8 @@ package ignition.core.jobs
 import org.apache.spark.{SparkConf, SparkContext}
 import org.joda.time.{DateTimeZone, DateTime}
 
+import scala.util.Try
+
 object CoreJobRunner {
 
   case class RunnerContext(sparkContext: SparkContext,
@@ -79,9 +81,15 @@ object CoreJobRunner {
 
       val context = RunnerContext(sc, config)
 
-      jobSetup.get.apply(context)
-
-      sc.stop()
+      try {
+        jobSetup.get.apply(context)
+      } catch {
+        case t: Throwable =>
+          t.printStackTrace()
+          System.exit(1) // force exit of all threads
+      }
+      Try { sc.stop() }
+      System.exit(0) // force exit of all threads
     }
   }
 }
