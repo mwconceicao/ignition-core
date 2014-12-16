@@ -60,16 +60,16 @@ object RDDUtils {
     }
 
     def incrementCounterIf(cond: (K, V) => Boolean, acc: spark.Accumulator[Int]): RDD[(K, V)] = {
-      rdd.mapValuesWithKeys(x => { if(cond(x._1, x._2)) acc += 1; x._2 })
+      rdd.mapPreservingPartitions(x => { if(cond(x._1, x._2)) acc += 1; x._2 })
     }
 
-    def flatMapValuesWithKeys[U: ClassTag](f: ((K, V)) => Seq[U]): RDD[(K, U)] = {
+    def flatMapPreservingPartitions[U: ClassTag](f: ((K, V)) => Seq[U]): RDD[(K, U)] = {
       rdd.mapPartitions[(K, U)](kvs => {
         kvs.flatMap[(K,U)](kv => Stream.continually(kv._1) zip f(kv))
       }, preservesPartitioning = true)
     }
 
-    def mapValuesWithKeys[U: ClassTag](f: ((K, V)) => U): RDD[(K, U)] = {
+    def mapPreservingPartitions[U: ClassTag](f: ((K, V)) => U): RDD[(K, U)] = {
       rdd.mapPartitions[(K, U)](kvs => {
         kvs.map[(K,U)](kv => (kv._1, f(kv)))
       }, preservesPartitioning = true)
