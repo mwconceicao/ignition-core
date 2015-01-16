@@ -177,5 +177,26 @@ object SparkContextUtils {
       else
         stringHadoopFile(paths, minimumPaths)
     }
+
+    private def objectHadoopFile[T:ClassTag](paths: Seq[String], minimumPaths: Int): RDD[T] = {
+      val minPartitions = 512 // FIXME: Read fixme on processTextFiles
+      new UnionRDD(sc, paths.map(sc.objectFile[T](_, minPartitions)))
+    }
+
+    def filterAndGetObjectHadoopFiles[T:ClassTag](path: String,
+                                                  requireSuccess: Boolean = false,
+                                                  inclusiveStartDate: Boolean = true,
+                                                  startDate: Option[DateTime] = None,
+                                                  inclusiveEndDate: Boolean = true,
+                                                  endDate: Option[DateTime] = None,
+                                                  lastN: Option[Int] = None,
+                                                  ignoreMalformedDates: Boolean = false,
+                                                  minimumPaths: Int = 1): RDD[T] = {
+      val paths = getFilteredPaths(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
+      if (paths.size < minimumPaths)
+        throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
+      else
+        objectHadoopFile(paths, minimumPaths)
+    }
   }
 }
