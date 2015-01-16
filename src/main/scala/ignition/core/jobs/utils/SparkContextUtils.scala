@@ -45,7 +45,7 @@ object SparkContextUtils {
     // This function will expand the paths then group they and give to RDDs
     // We group to avoid too many RDDs on union (each RDD take some memory on driver)
     // We avoid passing a path too big to one RDD to avoid a Hadoop bug where just part of the path is processed when the path is big
-    private def processPaths(f: (String) => RDD[String], paths: Seq[String], minimumPaths: Int): RDD[String] = {
+    private def processPaths[T:ClassTag](f: (String) => RDD[T], paths: Seq[String], minimumPaths: Int): RDD[T] = {
       val splittedPaths = paths.flatMap(ignition.core.utils.HadoopUtils.getPathStrings)
       if (splittedPaths.size < minimumPaths)
         throw new Exception(s"Not enough paths found for $paths")
@@ -176,6 +176,26 @@ object SparkContextUtils {
         processTextFiles(synchToHdfs(paths, stringHadoopFile, forceSynch), minimumPaths)
       else
         stringHadoopFile(paths, minimumPaths)
+    }
+
+    private def objectHadoopFile[T:ClassTag](paths: Seq[String], minimumPaths: Int): RDD[T] = {
+      processPaths(sc.objectFile[T](_), paths, minimumPaths)
+    }
+
+    def filterAndGetObjectHadoopFiles[T:ClassTag](path: String,
+                                                  requireSuccess: Boolean = false,
+                                                  inclusiveStartDate: Boolean = true,
+                                                  startDate: Option[DateTime] = None,
+                                                  inclusiveEndDate: Boolean = true,
+                                                  endDate: Option[DateTime] = None,
+                                                  lastN: Option[Int] = None,
+                                                  ignoreMalformedDates: Boolean = false,
+                                                  minimumPaths: Int = 1): RDD[T] = {
+      val paths = getFilteredPaths(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
+      if (paths.size < minimumPaths)
+        throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
+      else
+        objectHadoopFile(paths, minimumPaths)
     }
   }
 }
