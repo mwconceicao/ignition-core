@@ -45,7 +45,7 @@ object SparkContextUtils {
     // This function will expand the paths then group they and give to RDDs
     // We group to avoid too many RDDs on union (each RDD take some memory on driver)
     // We avoid passing a path too big to one RDD to avoid a Hadoop bug where just part of the path is processed when the path is big
-    private def processPaths(f: (String) => RDD[String], paths: Seq[String], minimumPaths: Int): RDD[String] = {
+    private def processPaths[T:ClassTag](f: (String) => RDD[T], paths: Seq[String], minimumPaths: Int): RDD[T] = {
       val splittedPaths = paths.flatMap(ignition.core.utils.HadoopUtils.getPathStrings)
       if (splittedPaths.size < minimumPaths)
         throw new Exception(s"Not enough paths found for $paths")
@@ -179,8 +179,7 @@ object SparkContextUtils {
     }
 
     private def objectHadoopFile[T:ClassTag](paths: Seq[String], minimumPaths: Int): RDD[T] = {
-      val minPartitions = 512 // FIXME: Read fixme on processTextFiles
-      new UnionRDD(sc, paths.map(sc.objectFile[T](_, minPartitions)))
+      processPaths(sc.objectFile[T](_), paths, minimumPaths)
     }
 
     def filterAndGetObjectHadoopFiles[T:ClassTag](path: String,
