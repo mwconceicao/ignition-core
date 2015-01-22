@@ -206,7 +206,8 @@ def is_active(instance):
 def get_spark_shark_version(opts):
     spark_shark_map = {
         "0.7.3": "0.7.1", "0.8.0": "0.8.0", "0.8.1": "0.8.1", "0.9.0": "0.9.0", "0.9.1": "0.9.1",
-        "1.0.0": "1.0.0", "1.0.1": "1.0.1", "1.0.2": "1.0.2", "1.1.0": "1.1.0"
+        "1.0.0": "1.0.0", "1.0.1": "1.0.1", "1.0.2": "1.0.2", "1.1.0": "1.1.0", "1.1.1": "1.1.1",
+        "1.2.0": "1.2.0",
     }
     version = opts.spark_version.replace("v", "")
     if version not in spark_shark_map:
@@ -571,7 +572,7 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key):
 
     # NOTE: We should clone the repository before running deploy_files to
     # prevent ec2-variables.sh from being overwritten
-    ssh(master, opts, "rm -rf spark-ec2 && git clone https://github.com/chaordic/spark-ec2.git -b v3")
+    ssh(master, opts, "rm -rf spark-ec2 && git clone https://github.com/chaordic/spark-ec2.git -b v4-yarn")
 
     print "Deploying files to master..."
     deploy_files(conn, "deploy.generic", opts, master_nodes, slave_nodes, modules)
