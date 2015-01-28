@@ -72,6 +72,7 @@ object CoreJobRunner {
       sparkConf.set("spark.storage.memoryFraction", "0.3")
       sparkConf.set("spark.reducer.maxMbInFlight", "15")
       sparkConf.set("spark.hadoop.validateOutputSpecs", "true")
+	sparkConf.set("spark.shuffle.consolidateFiles", "true")
       //sparkConf.set("spark.storage.blockManagerSlaveTimeoutMs", "120000")
 //      sparkConf.set("spark.eventLog.enabled", "true") // not supported on 1.0.2
       //sparkConf.set("spark.core.connection.ack.wait.timeout", "600")
