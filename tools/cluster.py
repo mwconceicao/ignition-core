@@ -46,7 +46,7 @@ default_key_file = os.path.expanduser('~/.ssh/ignition_key.pem')
 default_ami = 'ami-35b1885c'  # HVM AMI
 default_master_ami = 'ami-5bb18832'  # PVM AMI
 default_env = 'dev'
-default_spark_version = '1.2.0'
+default_spark_version = '4877_user_first_parent_inheritance' # stephenh/4877_user_first_parent_inheritance
 default_remote_user = 'ec2-user'
 default_remote_control_dir = '/tmp/Ignition'
 default_collect_results_dir = '/tmp'
@@ -268,6 +268,7 @@ def launch(cluster_name, slaves,
                                  '--spark-ec2-git-repo', spark_ec2_git_repo,
                                  '--spark-ec2-git-branch', spark_ec2_git_branch,
                                  '--worker-instances', worker_instances,
+                                 '--spark-git-repo', 'https://github.com/stephenh/spark',
                                  '--master-opts', '-Dspark.worker.timeout={0}'.format(worker_timeout),
                                  '-v', spark_version,
                                  '--user-data', user_data,
