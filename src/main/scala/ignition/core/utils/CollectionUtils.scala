@@ -6,8 +6,7 @@ import scalaz._
 
 object CollectionUtils {
 
-  //TODO: review this code
-  class RichCollection[A, Repr](xs: IterableLike[A, Repr]){
+  implicit class RichCollection[A, Repr](xs: IterableLike[A, Repr]){
     def distinctBy[B, That](f: A => B)(implicit cbf: CanBuildFrom[Repr, A, That]) = {
       val builder = cbf(xs.repr)
       val i = xs.iterator
@@ -24,40 +23,8 @@ object CollectionUtils {
     }
   }
 
-  implicit def toRich[A, Repr](xs: IterableLike[A, Repr]) = new RichCollection(xs)
-
-  // TODO: implement just one for all type
-  implicit class ValidatedSetCollection[A, B](seq: Set[Validation[A, B]]) {
-
-    def mapSuccess(f: B => Validation[A, B]): Set[Validation[A, B]] = {
-      seq.map({
-        case Success(v) => f(v)
-        case failure => failure
-      })
-    }
-  }
-
-  implicit class ValidatedListCollection[A, B](seq: List[Validation[A, B]]) {
-    def mapSuccess(f: B => Validation[A, B]): List[Validation[A, B]] = {
-      seq.map({
-        case Success(v) => f(v)
-        case failure => failure
-      })
-    }
-  }
-
-  implicit class ValidatedSeqCollection[A, B](seq: Seq[Validation[A, B]]) {
-    def mapSuccess(f: B => Validation[A, B]): Seq[Validation[A, B]] = {
-      seq.map({
-        case Success(v) => f(v)
-        case failure => failure
-      })
-    }
-  }
-
-  implicit class ValidatedIterableCollection[A, B](seq: Iterable[Validation[A, B]]) {
-
-    def mapSuccess(f: B => Validation[A, B]): Iterable[Validation[A, B]] = {
+  implicit class ValidatedIterableLike[T, R, Repr <: IterableLike[Validation[R, T], Repr]](seq: IterableLike[Validation[R, T], Repr]) {
+    def mapSuccess[That](f: T => Validation[R, T])(implicit cbf: CanBuildFrom[Repr, Validation[R, T], That]): That = {
       seq.map({
         case Success(v) => f(v)
         case failure => failure
