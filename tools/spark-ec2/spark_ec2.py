@@ -114,6 +114,8 @@ def parse_args():
     parser.add_option(
         "-a", "--ami",
         help="Amazon Machine Image ID to use")
+    parser.add_option("--master-ami",
+        help="Amazon Machine Image ID to use for the Master")
     parser.add_option(
         "-v", "--spark-version", default=DEFAULT_SPARK_VERSION,
         help="Version of Spark to use: 'X.Y.Z' or a specific git hash (default: %default)")
@@ -191,6 +193,9 @@ def parse_args():
     parser.add_option(
         "--user-data", type="string", default="",
         help="Path to a user-data file (most AMI's interpret this as an initialization script)")
+    parser.add_option(
+        "--security-group-prefix", type="string", default=None,
+        help="Use this prefix for the security group rather than the cluster name.")
     parser.add_option(
         "--authorized-address", type="string", default="0.0.0.0/0",
         help="Address to authorize on created security groups (default: %default)")
@@ -355,8 +360,13 @@ def launch_cluster(conn, opts, cluster_name):
             user_data_content = user_data_file.read()
 
     print "Setting up security groups..."
-    master_group = get_or_make_group(conn, cluster_name + "-master", opts.vpc_id)
-    slave_group = get_or_make_group(conn, cluster_name + "-slaves", opts.vpc_id)
+    if opts.security_group_prefix is None:
+        master_group = get_or_make_group(conn, cluster_name + "-master", opts.vpc_id)
+        slave_group = get_or_make_group(conn, cluster_name + "-slaves", opts.vpc_id)
+    else:
+        master_group = get_or_make_group(conn, opts.security_group_prefix + "-master", opts.vpc_id)
+        slave_group = get_or_make_group(conn, opts.security_group_prefix + "-slaves", opts.vpc_id)
+
     authorized_address = opts.authorized_address
     if master_group.rules == []:  # Group was just now created
         if opts.vpc_id is None:
@@ -421,6 +431,9 @@ def launch_cluster(conn, opts, cluster_name):
     if opts.ami is None:
         opts.ami = get_spark_ami(opts)
 
+    if opts.master_ami is None:
+        opts.master_ami = opts.ami
+
     # we use group ids to work around https://github.com/boto/boto/issues/350
     additional_group_ids = []
     if opts.additional_security_group:
@@ -433,6 +446,12 @@ def launch_cluster(conn, opts, cluster_name):
         image = conn.get_all_images(image_ids=[opts.ami])[0]
     except:
         print >> stderr, "Could not find AMI " + opts.ami
+        sys.exit(1)
+
+    try:
+        master_image = conn.get_all_images(image_ids=[opts.master_ami])[0]
+    except:
+        print >> stderr, "Could not find AMI " + opts.master_ami
         sys.exit(1)
 
     # Create block device mapping so that we can add EBS volumes if asked to.
@@ -551,8 +570,8 @@ def launch_cluster(conn, opts, cluster_name):
             master_type = opts.instance_type
         if opts.zone == 'all':
             opts.zone = random.choice(conn.get_all_zones()).name
-        master_res = image.run(key_name=opts.key_pair,
-                               security_group_ids=[master_group.id] + additional_group_ids,
+        master_res = master_image.run(key_name=opts.key_pair,
+-                               security_groups=[master_group] + additional_groups,
                                instance_type=master_type,
                                placement=opts.zone,
                                min_count=1,

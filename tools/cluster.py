@@ -44,6 +44,7 @@ default_zone = default_region + 'b'
 default_key_id = 'ignition_key'
 default_key_file = os.path.expanduser('~/.ssh/ignition_key.pem')
 default_ami = 'ami-35b1885c'  # HVM AMI
+default_master_ami = 'ami-5bb18832'  # PVM AMI
 default_env = 'dev'
 default_spark_version = '1.2.0'
 default_remote_user = 'ec2-user'
@@ -51,6 +52,9 @@ default_remote_control_dir = '/tmp/Ignition'
 default_collect_results_dir = '/tmp'
 default_user_data = os.path.join(script_path, 'scripts', 'S05mount-disks')
 default_defaults_filename = 'cluster_defaults.json'
+
+default_spark_ec2_git_repo = 'https://github.com/chaordic/spark-ec2.git'
+default_spark_ec2_git_branch = 'v4-yarn'
 
 
 master_post_create_commands = [
@@ -211,7 +215,7 @@ def launch(cluster_name, slaves,
            script_timeout_inactivity_minutes=10,
            resume=False, just_ignore_existing=False, worker_timeout=240,
            spark_version=default_spark_version,
-           ami=default_ami):
+           ami=default_ami, master_ami=default_master_ami):
 
     all_args = locals()
 
@@ -249,6 +253,7 @@ def launch(cluster_name, slaves,
             log.info('Running script, try %d of %d', i + 1, retries_on_same_cluster)
             try:
                 call_ec2_script(['--ami', ami,
+                                 '--master-ami', master_ami,
                                  '--identity-file', key_file,
                                  '--key-pair', key_id,
                                  '--slaves', slaves,
@@ -258,6 +263,8 @@ def launch(cluster_name, slaves,
                                  '--master-instance-type', master_instance_type,
                                  '--wait', wait_time,
                                  '--hadoop-major-version', hadoop_major_version,
+                                 '--spark-ec2-git-repo', default_spark_ec2_git_repo,
+                                 '--spark-ec2-git-branch', default_spark_ec2_git_branch,
                                  '--worker-instances', worker_instances,
                                  '--master-opts', '-Dspark.worker.timeout={0}'.format(worker_timeout),
                                  '-v', spark_version,
