@@ -571,7 +571,7 @@ def launch_cluster(conn, opts, cluster_name):
         if opts.zone == 'all':
             opts.zone = random.choice(conn.get_all_zones()).name
         master_res = master_image.run(key_name=opts.key_pair,
--                               security_groups=[master_group] + additional_groups,
+                               security_group_ids=[master_group.id] + additional_group_ids,
                                instance_type=master_type,
                                placement=opts.zone,
                                min_count=1,

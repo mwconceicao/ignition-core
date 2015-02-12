@@ -53,7 +53,7 @@ default_collect_results_dir = '/tmp'
 default_user_data = os.path.join(script_path, 'scripts', 'S05mount-disks')
 default_defaults_filename = 'cluster_defaults.json'
 
-default_spark_ec2_git_repo = 'https://github.com/chaordic/spark-ec2.git'
+default_spark_ec2_git_repo = 'https://github.com/chaordic/spark-ec2'
 default_spark_ec2_git_branch = 'v4-yarn'
 
 
