@@ -53,6 +53,9 @@ default_collect_results_dir = '/tmp'
 default_user_data = os.path.join(script_path, 'scripts', 'S05mount-disks')
 default_defaults_filename = 'cluster_defaults.json'
 
+default_spark_ec2_git_repo = 'https://github.com/chaordic/spark-ec2'
+default_spark_ec2_git_branch = 'v4-yarn'
+
 
 master_post_create_commands = [
     'sudo', 'yum', '-y', 'install', 'tmux'
@@ -200,6 +203,8 @@ def launch(cluster_name, slaves,
            ondemand=False, spot_price=default_spot_price,
            user_data=default_user_data,
            security_group = None,
+           vpc = None,
+           vpc_subnet = None,
            master_instance_type=default_master_instance_type,
            wait_time='180', hadoop_major_version='1',
            worker_instances=default_worker_instances, retries_on_same_cluster=5,
@@ -210,6 +215,8 @@ def launch(cluster_name, slaves,
            script_timeout_inactivity_minutes=10,
            resume=False, just_ignore_existing=False, worker_timeout=240,
            spark_version=default_spark_version,
+           spark_ec2_git_repo=default_spark_ec2_git_repo,
+           spark_ec2_git_branch=default_spark_ec2_git_branch,
            ami=default_ami, master_ami=default_master_ami):
 
     all_args = locals()
@@ -233,6 +240,14 @@ def launch(cluster_name, slaves,
                 '--additional-security-group', security_group
             ])
 
+        # '--vpc-id', default_vpc,
+        # '--subnet-id', default_vpc_subnet,
+        if vpc and vpc_subnet:
+            auth_params.extend([
+                '--vpc-id', vpc,
+                '--subnet-id', vpc_subnet,
+            ])
+
         spot_params = ['--spot-price', spot_price]
         if ondemand:
             spot_params = []
@@ -250,6 +265,8 @@ def launch(cluster_name, slaves,
                                  '--master-instance-type', master_instance_type,
                                  '--wait', wait_time,
                                  '--hadoop-major-version', hadoop_major_version,
+                                 '--spark-ec2-git-repo', spark_ec2_git_repo,
+                                 '--spark-ec2-git-branch', spark_ec2_git_branch,
                                  '--worker-instances', worker_instances,
                                  '--master-opts', '-Dspark.worker.timeout={0}'.format(worker_timeout),
                                  '-v', spark_version,
