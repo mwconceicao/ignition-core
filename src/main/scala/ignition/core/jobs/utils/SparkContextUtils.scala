@@ -122,7 +122,8 @@ object SparkContextUtils {
       }
       // We delete first because we may have two paths in the same parent
       mapPaths((p, hdfsPath) => delete(new Path(hdfsPath).getParent))// delete parent to avoid old files being accumulated
-      mapPaths((p, hdfsPath) => pathsToRdd(Seq(p), 0).coalesce(sc.defaultParallelism, true).saveAsTextFile(hdfsPath))
+      // FIXME: We should be using a variable from the SparkContext, not a hard coded value (1500).
+      mapPaths((p, hdfsPath) => pathsToRdd(Seq(p), 0).coalesce(1500, true).saveAsTextFile(hdfsPath))
     }
 
 
