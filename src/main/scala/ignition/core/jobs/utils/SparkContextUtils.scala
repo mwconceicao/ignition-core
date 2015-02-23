@@ -110,10 +110,11 @@ object SparkContextUtils {
     lazy val hdfsPathPrefix = sc.master.replaceFirst("spark://(.*):7077", "hdfs://$1:9000/")
 
     def synchToHdfs(paths: Seq[String], pathsToRdd: (Seq[String], Int) => RDD[String], forceSynch: Boolean): Seq[String] = {
+      val filesToOutput = 1500
       def mapPaths(actionWhenNeedsSynching: (String, String) => Unit): Seq[String] = {
         paths.map(p => {
           val hdfsPath = p.replace("s3n://", hdfsPathPrefix)
-          if (forceSynch || getStatus(hdfsPath, false).isEmpty || getStatus(s"$hdfsPath/*", true).filterNot(_.isDir).size != sc.defaultParallelism) {
+          if (forceSynch || getStatus(hdfsPath, false).isEmpty || getStatus(s"$hdfsPath/*", true).filterNot(_.isDir).size != filesToOutput) {
             val _hdfsPath = new Path(hdfsPath)
             actionWhenNeedsSynching(p, hdfsPath)
           }
@@ -123,7 +124,7 @@ object SparkContextUtils {
       // We delete first because we may have two paths in the same parent
       mapPaths((p, hdfsPath) => delete(new Path(hdfsPath).getParent))// delete parent to avoid old files being accumulated
       // FIXME: We should be using a variable from the SparkContext, not a hard coded value (1500).
-      mapPaths((p, hdfsPath) => pathsToRdd(Seq(p), 0).coalesce(1500, true).saveAsTextFile(hdfsPath))
+      mapPaths((p, hdfsPath) => pathsToRdd(Seq(p), 0).coalesce(filesToOutput, true).saveAsTextFile(hdfsPath))
     }
 
 
