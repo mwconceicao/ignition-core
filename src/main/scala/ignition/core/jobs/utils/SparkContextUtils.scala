@@ -8,6 +8,7 @@ import org.apache.spark.SparkContext
 import org.apache.hadoop.fs.{FileStatus, Path, FileSystem}
 import org.apache.spark.rdd.{UnionRDD, RDD}
 import org.joda.time.{DateTimeZone, DateTime}
+import ignition.core.utils.DateUtils._
 
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -38,8 +39,8 @@ object SparkContextUtils {
 
     // This call is equivalent to a ls -d in shell, but won't fail if part of a path matches nothing,
     // For instance, given path = s3n://bucket/{a,b}, it will work fine if a exists but b is missing
-    def sortedGlobPath(path: String, removeEmpty: Boolean = true): Seq[String] = {
-      val paths = ignition.core.utils.HadoopUtils.getPathStrings(path)
+    def sortedGlobPath(_paths: Seq[String], removeEmpty: Boolean = true): Seq[String] = {
+      val paths = _paths.flatMap(path => ignition.core.utils.HadoopUtils.getPathStrings(path))
       paths.flatMap(p => getStatus(p, removeEmpty)).map(_.getPath.toString).distinct.sorted
     }
 
@@ -61,7 +62,7 @@ object SparkContextUtils {
       processPaths((p) => sc.textFile(p, minPartitions), paths, minimumPaths)
     }
 
-    private def filterPaths(path: String,
+    private def filterPaths(paths: Seq[String],
                             requireSuccess: Boolean,
                             inclusiveStartDate: Boolean,
                             startDate: Option[DateTime],
@@ -69,24 +70,24 @@ object SparkContextUtils {
                             endDate: Option[DateTime],
                             lastN: Option[Int],
                             ignoreMalformedDates: Boolean): Seq[String] = {
-      val sortedPaths = sortedGlobPath(path)
+      val sortedPaths = sortedGlobPath(paths)
       val filteredByDate = if (startDate.isEmpty && endDate.isEmpty)
         sortedPaths
       else
-        sortedPaths.filter(p => {
+        sortedPaths.filter { p =>
           val tryDate = Try { PathUtils.extractDate(p) }
           if (tryDate.isFailure && ignoreMalformedDates)
             false
           else {
             val date = tryDate.get
-            val goodStartDate = startDate.isEmpty || (inclusiveStartDate && date.withZone(DateTimeZone.UTC).equals(startDate.get.withZone(DateTimeZone.UTC))) || date.isAfter(startDate.get)
-            val goodEndDate = endDate.isEmpty || (inclusiveEndDate && date.withZone(DateTimeZone.UTC).equals(endDate.get.withZone(DateTimeZone.UTC))) || date.isBefore(endDate.get)
+            val goodStartDate = startDate.isEmpty || (inclusiveStartDate && date.isEqualOrAfter(startDate.get))
+            val goodEndDate = endDate.isEmpty || (inclusiveEndDate && date.isEqualOrBefore(endDate.get))
             goodStartDate && goodEndDate
           }
-        })
+        }
 
       // Use a stream here to avoid checking the success if we are going to just take a few files
-      val filteredBySuccessAndReversed = filteredByDate.reverse.toStream.dropWhile(p => requireSuccess && sortedGlobPath(s"$p/{_SUCCESS,_FINISHED}", removeEmpty = false).isEmpty)
+      val filteredBySuccessAndReversed = filteredByDate.reverse.toStream.dropWhile(p => requireSuccess && sortedGlobPath(Seq(s"$p/{_SUCCESS,_FINISHED}"), removeEmpty = false).isEmpty)
 
       if (lastN.isDefined)
         filteredBySuccessAndReversed.take(lastN.get).reverse.toList
@@ -94,7 +95,7 @@ object SparkContextUtils {
         filteredBySuccessAndReversed.reverse.toList
     }
 
-    def getFilteredPaths(path: String,
+    def getFilteredPaths(paths: Seq[String],
                          requireSuccess: Boolean,
                          inclusiveStartDate: Boolean,
                          startDate: Option[DateTime],
@@ -103,7 +104,7 @@ object SparkContextUtils {
                          lastN: Option[Int],
                          ignoreMalformedDates: Boolean): Seq[String] = {
       require(lastN.isEmpty || endDate.isDefined, "If you are going to get the last files, better specify the end date to avoid getting files in the future")
-      filterPaths(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
+      filterPaths(paths, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
     }
 
 
@@ -147,7 +148,7 @@ object SparkContextUtils {
                               forceSynch: Boolean = false,
                               ignoreMalformedDates: Boolean = false,
                               minimumPaths: Int = 1): RDD[String] = {
-      val paths = getFilteredPaths(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
+      val paths = getFilteredPaths(Seq(path), requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else if (synchLocally)
@@ -170,7 +171,7 @@ object SparkContextUtils {
                                       lastN: Option[Int] = None,
                                       ignoreMalformedDates: Boolean = false,
                                       minimumPaths: Int = 1): RDD[Try[String]] = {
-      val paths = getFilteredPaths(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
+      val paths = getFilteredPaths(Seq(path), requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else
@@ -190,7 +191,7 @@ object SparkContextUtils {
                                                   lastN: Option[Int] = None,
                                                   ignoreMalformedDates: Boolean = false,
                                                   minimumPaths: Int = 1): RDD[T] = {
-      val paths = getFilteredPaths(path, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
+      val paths = getFilteredPaths(Seq(path), requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
       else
