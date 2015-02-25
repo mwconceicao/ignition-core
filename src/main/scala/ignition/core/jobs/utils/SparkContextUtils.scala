@@ -69,13 +69,13 @@ object SparkContextUtils {
                             inclusiveEndDate: Boolean,
                             endDate: Option[DateTime],
                             lastN: Option[Int],
-                            ignoreMalformedDates: Boolean): Seq[String] = {
+                            ignoreMalformedDates: Boolean)(implicit dateExtractor: PathDateExtractor): Seq[String] = {
       val sortedPaths = sortedGlobPath(paths)
       val filteredByDate = if (startDate.isEmpty && endDate.isEmpty)
         sortedPaths
       else
         sortedPaths.filter { p =>
-          val tryDate = Try { PathUtils.extractDate(p) }
+          val tryDate = Try { dateExtractor.extractFromPath(p) }
           if (tryDate.isFailure && ignoreMalformedDates)
             false
           else {
@@ -95,6 +95,12 @@ object SparkContextUtils {
         filteredBySuccessAndReversed.reverse.toList
     }
 
+
+
+    val dummyDateExtractor = new PathDateExtractor {
+      override def extractFromPath(path: String): DateTime = throw new Exception("No date extractor implemented")
+    }
+
     def getFilteredPaths(paths: Seq[String],
                          requireSuccess: Boolean,
                          inclusiveStartDate: Boolean,
@@ -102,7 +108,7 @@ object SparkContextUtils {
                          inclusiveEndDate: Boolean,
                          endDate: Option[DateTime],
                          lastN: Option[Int],
-                         ignoreMalformedDates: Boolean): Seq[String] = {
+                         ignoreMalformedDates: Boolean)(implicit dateExtractor: PathDateExtractor): Seq[String] = {
       require(lastN.isEmpty || endDate.isDefined, "If you are going to get the last files, better specify the end date to avoid getting files in the future")
       filterPaths(paths, requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
     }
@@ -129,14 +135,6 @@ object SparkContextUtils {
     }
 
 
-    def prepareRDDForMultipleReads[V: ClassTag](rdd: RDD[V], deleteOld: Boolean = true): RDD[V] = {
-      val path = s"${hdfsPathPrefix}rddsForMultipleReads/${new Date().getTime()}"
-      if (deleteOld)
-        delete(new Path(path).getParent)
-      rdd.saveAsObjectFile(path)
-      sc.objectFile[V](path)
-    }
-
     def filterAndGetTextFiles(path: String,
                               requireSuccess: Boolean = false,
                               inclusiveStartDate: Boolean = true,
@@ -147,7 +145,7 @@ object SparkContextUtils {
                               synchLocally: Boolean = false,
                               forceSynch: Boolean = false,
                               ignoreMalformedDates: Boolean = false,
-                              minimumPaths: Int = 1): RDD[String] = {
+                              minimumPaths: Int = 1)(implicit dateExtractor: PathDateExtractor): RDD[String] = {
       val paths = getFilteredPaths(Seq(path), requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
@@ -170,7 +168,7 @@ object SparkContextUtils {
                                       endDate: Option[DateTime] = None,
                                       lastN: Option[Int] = None,
                                       ignoreMalformedDates: Boolean = false,
-                                      minimumPaths: Int = 1): RDD[Try[String]] = {
+                                      minimumPaths: Int = 1)(implicit dateExtractor: PathDateExtractor): RDD[Try[String]] = {
       val paths = getFilteredPaths(Seq(path), requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
@@ -190,7 +188,7 @@ object SparkContextUtils {
                                                   endDate: Option[DateTime] = None,
                                                   lastN: Option[Int] = None,
                                                   ignoreMalformedDates: Boolean = false,
-                                                  minimumPaths: Int = 1): RDD[T] = {
+                                                  minimumPaths: Int = 1)(implicit dateExtractor: PathDateExtractor): RDD[T] = {
       val paths = getFilteredPaths(Seq(path), requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
