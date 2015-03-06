@@ -46,6 +46,7 @@ default_key_file = os.path.expanduser('~/.ssh/ignition_key.pem')
 default_ami = 'ami-35b1885c'  # HVM AMI
 default_master_ami = 'ami-5bb18832'  # PVM AMI
 default_env = 'dev'
+default_spark_repo = 'https://github.com/fparisotto/spark'
 default_spark_version = 'classpath-fix'
 default_remote_user = 'ec2-user'
 default_remote_control_dir = '/tmp/Ignition'
@@ -214,6 +215,7 @@ def launch(cluster_name, slaves,
            script_timeout_total_minutes=55,
            script_timeout_inactivity_minutes=10,
            resume=False, just_ignore_existing=False, worker_timeout=240,
+           spark_repo=default_spark_repo,
            spark_version=default_spark_version,
            spark_ec2_git_repo=default_spark_ec2_git_repo,
            spark_ec2_git_branch=default_spark_ec2_git_branch,
@@ -268,8 +270,8 @@ def launch(cluster_name, slaves,
                                  '--spark-ec2-git-repo', spark_ec2_git_repo,
                                  '--spark-ec2-git-branch', spark_ec2_git_branch,
                                  '--worker-instances', worker_instances,
-                                 '--spark-git-repo', 'https://github.com/fparisotto/spark',
                                  '--master-opts', '-Dspark.worker.timeout={0}'.format(worker_timeout),
+                                 '--spark-git-repo', spark_repo,
                                  '-v', spark_version,
                                  '--user-data', user_data,
                                  'launch', cluster_name] +
