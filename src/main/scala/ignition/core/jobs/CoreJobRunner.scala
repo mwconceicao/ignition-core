@@ -19,7 +19,7 @@ object CoreJobRunner {
                           executorMemory: String = "2G",
                           additionalArgs: Map[String, String] = Map.empty)
 
-  def runJobSetup(args: Array[String], jobsSetups: Map[String, (RunnerContext) => Unit]) {
+  def runJobSetup(args: Array[String], jobsSetups: Map[String, (CoreJobRunner.RunnerContext => Unit, Map[String, String])], defaultSparkConfMap: Map[String, String]) {
     val parser = new scopt.OptionParser[RunnerConfig]("Runner") {
       help("help") text("prints this usage text")
       arg[String]("<setup-name>") required() action { (x, c) =>
@@ -48,35 +48,25 @@ object CoreJobRunner {
     }
 
     parser.parse(args, RunnerConfig()) map { config =>
-      val jobSetup = jobsSetups.get(config.setupName)
+      val setup = jobsSetups.get(config.setupName)
 
-      require(jobSetup.isDefined,
+      require(setup.isDefined,
         s"Invalid job setup ${config.setupName}, available jobs setups: ${jobsSetups.keySet}")
+
+      val Some((jobSetup, jobConf)) = setup
 
       val appName = s"${config.setupName}.${config.tag}"
 
 
-      val sparkConf = new SparkConf
-//      val sparkConf = new SparkConf
+      val sparkConf = new SparkConf()
+      sparkConf.set("spark.executor.memory", config.executorMemory)
+
       sparkConf.setMaster(config.master)
       sparkConf.setAppName(appName)
-      //sparkConf.setJars(SparkContext.jarOfClass(this.getClass).toSeq)
-      sparkConf.set("spark.executor.memory", config.executorMemory)
-      sparkConf.set("spark.logConf", "true")
-      sparkConf.set("spark.executor.extraJavaOptions", "-Djava.io.tmpdir=/mnt -verbose:gc -XX:-PrintGCDetails -XX:+PrintGCTimeStamps -XX:-UseGCOverheadLimit")
-      //sparkConf.set("spark.speculation", "true")
-      sparkConf.set("spark.akka.frameSize", "500")
-      sparkConf.set("spark.files.userClassPathFirst", "true")
-//
-      sparkConf.set("spark.default.parallelism", "1600")
-      sparkConf.set("spark.shuffle.memoryFraction", "0.2")
-      sparkConf.set("spark.storage.memoryFraction", "0.3")
-      //sparkConf.set("spark.reducer.maxMbInFlight", "15")
-      sparkConf.set("spark.hadoop.validateOutputSpecs", "true")
-      //sparkConf.set("spark.storage.blockManagerSlaveTimeoutMs", "120000")
-//      sparkConf.set("spark.eventLog.enabled", "true") // not supported on 1.0.2
-      //sparkConf.set("spark.core.connection.ack.wait.timeout", "600")
-      //sparkConf.set("spark.shuffle.spill.compress", "false")
+      
+      defaultSparkConfMap.foreach { case (k, v) => sparkConf.set(k, v) }
+
+      jobConf.foreach { case (k, v) => sparkConf.set(k, v) }
 
       val sc = new SparkContext(sparkConf)
 
@@ -84,7 +74,7 @@ object CoreJobRunner {
       val context = RunnerContext(sc, config)
 
       try {
-        jobSetup.get.apply(context)
+        jobSetup.apply(context)
       } catch {
         case t: Throwable =>
           t.printStackTrace()
