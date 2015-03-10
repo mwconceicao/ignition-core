@@ -865,8 +865,9 @@ def deploy_files(conn, root_dir, opts, master_nodes, slave_nodes, modules):
     cluster_url = "%s:7077" % active_master
 
     if opts.spark_version.startswith("http"):
+        # Custom pre-built spark package
         spark_v = get_validate_spark_version(opts.spark_version, opts.spark_git_repo)
-    if "." in opts.spark_version:
+    elif "." in opts.spark_version:
         # Pre-built Spark deploy
         spark_v = get_validate_spark_version(opts.spark_version, opts.spark_git_repo)
     else:
