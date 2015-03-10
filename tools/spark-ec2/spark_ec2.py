@@ -246,7 +246,16 @@ def get_or_make_group(conn, name, vpc_id):
 
 
 def get_validate_spark_version(version, repo):
-    if "." in version:
+    if version.startswith("http"):
+        #check if custom package URL exists
+        try:
+            response = requests.head(version)
+            if response.status_code == 200:
+                return version
+        except:
+            print >> stderr, "Unable to validate pre-built spark version {version}".format(version=version)
+            sys.exit(1)
+    elif "." in version:
         version = version.replace("v", "")
         if version not in VALID_SPARK_VERSIONS:
             print >> stderr, "Don't know about Spark version: {v}".format(v=version)
@@ -855,6 +864,8 @@ def deploy_files(conn, root_dir, opts, master_nodes, slave_nodes, modules):
 
     cluster_url = "%s:7077" % active_master
 
+    if opts.spark_version.startswith("http"):
+        spark_v = get_validate_spark_version(opts.spark_version, opts.spark_git_repo)
     if "." in opts.spark_version:
         # Pre-built Spark deploy
         spark_v = get_validate_spark_version(opts.spark_version, opts.spark_git_repo)
