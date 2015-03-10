@@ -1,11 +1,9 @@
 package ignition.core.jobs.utils
 
-import org.apache.spark.rdd.{PairRDDFunctions, CoGroupedRDD, RDD}
-import org.apache.spark.SparkContext._
-import org.apache.spark.Partitioner
 import org.apache.spark
+import org.apache.spark.SparkContext._
+import org.apache.spark.rdd.RDD
 
-import scala.collection.mutable
 import scala.reflect.ClassTag
 import scalaz.{Success, Validation}
 
