@@ -46,7 +46,6 @@ default_key_file = os.path.expanduser('~/.ssh/ignition_key.pem')
 default_ami = 'ami-35b1885c'  # HVM AMI
 default_master_ami = 'ami-5bb18832'  # PVM AMI
 default_env = 'dev'
-default_spark_repo = ''
 default_spark_version = 'https://circle-artifacts.com/gh/chaordic/spark/3/artifacts/0/tmp/circle-artifacts.zAWvGZt/spark-1.2.2-SNAPSHOT-bin-1.0.4.tgz'
 default_remote_user = 'ec2-user'
 default_remote_control_dir = '/tmp/Ignition'
@@ -215,7 +214,6 @@ def launch(cluster_name, slaves,
            script_timeout_total_minutes=55,
            script_timeout_inactivity_minutes=10,
            resume=False, just_ignore_existing=False, worker_timeout=240,
-           spark_repo=default_spark_repo,
            spark_version=default_spark_version,
            spark_ec2_git_repo=default_spark_ec2_git_repo,
            spark_ec2_git_branch=default_spark_ec2_git_branch,
@@ -271,7 +269,6 @@ def launch(cluster_name, slaves,
                                  '--spark-ec2-git-branch', spark_ec2_git_branch,
                                  '--worker-instances', worker_instances,
                                  '--master-opts', '-Dspark.worker.timeout={0}'.format(worker_timeout),
-                                 '--spark-git-repo', spark_repo,
                                  '-v', spark_version,
                                  '--user-data', user_data,
                                  'launch', cluster_name] +

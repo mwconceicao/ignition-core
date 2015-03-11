@@ -249,13 +249,15 @@ def check_if_http_resource_exists(resource):
     request.get_method = lambda: 'HEAD'
     try:
         response = urllib2.urlopen(request)
+        if response.getcode() == 200:
+            return True
+        else:
+            raise RuntimeError("Resource {resource} not found. Error: {code}".format(resource, response.getcode()))
     except urllib2.HTTPError, e:
         print >> stderr, "Unable to check if HTTP resource {url} exists. Error: {code}".format(
             url=resource,
             code=e.code)
         return False
-    else:
-        return True
 
 def get_validate_spark_version(version, repo):
     if version.startswith("http"):
