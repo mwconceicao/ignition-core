@@ -244,15 +244,25 @@ def get_or_make_group(conn, name, vpc_id):
         print "Creating security group " + name
         return conn.create_security_group(name, "Spark EC2 group", vpc_id)
 
+def check_if_http_resource_exists(resource):
+    request = urllib2.Request(resource)
+    request.get_method = lambda: 'HEAD'
+    try:
+        response = urllib2.urlopen(request)
+    except urllib2.HTTPError, e:
+        print >> stderr, "Unable to check if HTTP resource {url} exists. Error: {code}".format(
+            url=resource,
+            code=e.code)
+        return False
+    else:
+        return True
 
 def get_validate_spark_version(version, repo):
     if version.startswith("http"):
         #check if custom package URL exists
-        try:
-            response = requests.head(version)
-            if response.status_code == 200:
-                return version
-        except:
+        if check_if_http_resource_exists:
+            return version
+        else:
             print >> stderr, "Unable to validate pre-built spark version {version}".format(version=version)
             sys.exit(1)
     elif "." in version:
@@ -263,15 +273,12 @@ def get_validate_spark_version(version, repo):
         return version
     else:
         github_commit_url = "{repo}/commit/{commit_hash}".format(repo=repo, commit_hash=version)
-        request = urllib2.Request(github_commit_url)
-        request.get_method = lambda: 'HEAD'
-        try:
-            response = urllib2.urlopen(request)
-        except urllib2.HTTPError, e:
-            print >> stderr, "Couldn't validate Spark commit: {url}".format(url=github_commit_url)
-            print >> stderr, "Received HTTP response code of {code}.".format(code=e.code)
+        if not check_if_http_resource_exists(github_commit_url):
+            print >> stderr, "Couldn't validate Spark commit: {repo} / {commit}".format(
+                repo=repo, commit=version)
             sys.exit(1)
-        return version
+        else:
+            return version
 
 
 # Check whether a given EC2 instance object is in a state we consider active,
