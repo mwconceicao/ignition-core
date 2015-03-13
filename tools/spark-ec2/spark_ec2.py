@@ -244,9 +244,30 @@ def get_or_make_group(conn, name, vpc_id):
         print "Creating security group " + name
         return conn.create_security_group(name, "Spark EC2 group", vpc_id)
 
+def check_if_http_resource_exists(resource):
+    request = urllib2.Request(resource)
+    request.get_method = lambda: 'HEAD'
+    try:
+        response = urllib2.urlopen(request)
+        if response.getcode() == 200:
+            return True
+        else:
+            raise RuntimeError("Resource {resource} not found. Error: {code}".format(resource, response.getcode()))
+    except urllib2.HTTPError, e:
+        print >> stderr, "Unable to check if HTTP resource {url} exists. Error: {code}".format(
+            url=resource,
+            code=e.code)
+        return False
 
 def get_validate_spark_version(version, repo):
-    if "." in version:
+    if version.startswith("http"):
+        #check if custom package URL exists
+        if check_if_http_resource_exists:
+            return version
+        else:
+            print >> stderr, "Unable to validate pre-built spark version {version}".format(version=version)
+            sys.exit(1)
+    elif "." in version:
         version = version.replace("v", "")
         if version not in VALID_SPARK_VERSIONS:
             print >> stderr, "Don't know about Spark version: {v}".format(v=version)
@@ -254,15 +275,12 @@ def get_validate_spark_version(version, repo):
         return version
     else:
         github_commit_url = "{repo}/commit/{commit_hash}".format(repo=repo, commit_hash=version)
-        request = urllib2.Request(github_commit_url)
-        request.get_method = lambda: 'HEAD'
-        try:
-            response = urllib2.urlopen(request)
-        except urllib2.HTTPError, e:
-            print >> stderr, "Couldn't validate Spark commit: {url}".format(url=github_commit_url)
-            print >> stderr, "Received HTTP response code of {code}.".format(code=e.code)
+        if not check_if_http_resource_exists(github_commit_url):
+            print >> stderr, "Couldn't validate Spark commit: {repo} / {commit}".format(
+                repo=repo, commit=version)
             sys.exit(1)
-        return version
+        else:
+            return version
 
 
 # Check whether a given EC2 instance object is in a state we consider active,
@@ -855,7 +873,10 @@ def deploy_files(conn, root_dir, opts, master_nodes, slave_nodes, modules):
 
     cluster_url = "%s:7077" % active_master
 
-    if "." in opts.spark_version:
+    if opts.spark_version.startswith("http"):
+        # Custom pre-built spark package
+        spark_v = get_validate_spark_version(opts.spark_version, opts.spark_git_repo)
+    elif "." in opts.spark_version:
         # Pre-built Spark deploy
         spark_v = get_validate_spark_version(opts.spark_version, opts.spark_git_repo)
     else:
