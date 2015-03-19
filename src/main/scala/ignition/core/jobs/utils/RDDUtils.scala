@@ -1,13 +1,10 @@
 package ignition.core.jobs.utils
 
-import scala.reflect._
-import org.apache.spark.rdd.{PairRDDFunctions, CoGroupedRDD, RDD}
-import org.apache.spark.SparkContext._
-import org.apache.spark.Partitioner
 import org.apache.spark
-import org.joda.time.DateTime
-import org.joda.time.format.DateTimeFormat
+import org.apache.spark.SparkContext._
+import org.apache.spark.rdd.RDD
 
+import scala.reflect.ClassTag
 import scalaz.{Success, Validation}
 
 object RDDUtils {
@@ -73,6 +70,20 @@ object RDDUtils {
       rdd.mapPartitions[(K, U)](kvs => {
         kvs.map[(K,U)](kv => (kv._1, f(kv)))
       }, preservesPartitioning = true)
+    }
+
+    // TODO: add an way to log if we reach the limit
+    def groupByKeyAndTake(n: Int): RDD[(K, List[V])] =
+      rdd.aggregateByKey(List.empty[V])(
+        (lst, v) => if (lst.size >= n) lst else v :: lst,
+        (lstA, lstB) => if (lstA.size >= n) lstA else if (lstB.size >= n) lstB else (lstA ++ lstB).take(n)
+      )
+
+    def groupByKeyAndTakeOrdered[B >: V](n: Int)(implicit ord: Ordering[V]): RDD[(K, List[V])] = {
+      rdd.aggregateByKey(BoundedPriorityQueue(n))(
+        (lst, v) => lst.+(v),
+        (lstA, lstB) => lstA.++(lstB)
+      ).mapValues(_.toList)
     }
     
   }
