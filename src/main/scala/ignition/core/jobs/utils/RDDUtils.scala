@@ -1,13 +1,10 @@
 package ignition.core.jobs.utils
 
-import scala.reflect._
-import org.apache.spark.rdd.{PairRDDFunctions, CoGroupedRDD, RDD}
-import org.apache.spark.SparkContext._
-import org.apache.spark.Partitioner
 import org.apache.spark
-import org.joda.time.DateTime
-import org.joda.time.format.DateTimeFormat
+import org.apache.spark.SparkContext._
+import org.apache.spark.rdd.RDD
 
+import scala.reflect.ClassTag
 import scalaz.{Success, Validation}
 
 object RDDUtils {
@@ -75,7 +72,6 @@ object RDDUtils {
       }, preservesPartitioning = true)
     }
 
-
     // TODO: add an way to log if we reach the limit
     def groupByKeyAndTake(n: Int): RDD[(K, List[V])] =
       rdd.aggregateByKey(List.empty[V])(
@@ -83,14 +79,11 @@ object RDDUtils {
         (lstA, lstB) => if (lstA.size >= n) lstA else if (lstB.size >= n) lstB else (lstA ++ lstB).take(n)
       )
 
-    // Note: completely unoptimized. We could use instead for better performance:
-    // 1) sortByKey
-    // 2) something like: http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/collect/MinMaxPriorityQueue.html
-    // 3) Dig in the implementation details and modify the Aggregator or ShuffleRDD to sort and limit data
-    def groupByKeyAndTakeOrdered[B >: V](n: Int)(implicit ord: Ordering[B]): RDD[(K, List[V])] = {
-      rdd.aggregateByKey(List.empty[V])(
-        (lst, v) => (v :: lst).sorted(ord).take(n),
-        (lstA, lstB) => (lstA ++ lstB).sorted(ord).take(n))
+    def groupByKeyAndTakeOrdered[B >: V](n: Int)(implicit ord: Ordering[V]): RDD[(K, List[V])] = {
+      rdd.aggregateByKey(BoundedPriorityQueue(n))(
+        (lst, v) => lst.+(v),
+        (lstA, lstB) => lstA.++(lstB)
+      ).mapValues(_.toList)
     }
     
   }
