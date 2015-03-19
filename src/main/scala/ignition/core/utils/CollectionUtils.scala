@@ -49,4 +49,20 @@ object CollectionUtils {
   def mutableMapToImmutable[K, V](map: scala.collection.mutable.Map[K, V]): Map[K, V] = {
     map.toMap
   }
+
+  implicit class PairRDDLikeOps[K, V](iterable: Iterable[(K, V)]) {
+    def groupByKey(): List[(K, Iterable[V])] = {
+      iterable
+        .groupBy { case (k, v) => k }
+        .mapValues(_.map { case (k, v) => v })
+        .toList
+    }
+    
+    def reduceByKey(fn: (V, V) => V): List[(K, V)] = {
+      iterable
+        .groupBy { case (k, v) => k }
+        .mapValues(_.map { case (k, v) => v }.reduce(fn))
+        .toList
+    }
+  }
 }
