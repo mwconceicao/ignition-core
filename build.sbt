@@ -1,15 +1,10 @@
-name := "Ignition-core"
+name := "Ignition-Core"
 
-version := "0.2"
+version := "1.0"
 
 scalaVersion := "2.10.4"
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xfatal-warnings")
-
-//scalacOptions += "-target:jvm-1.7"
-
-//scalacOptions += "-print" // Just for debugging purposes
-
 
 ideaExcludeFolders += ".idea"
 
@@ -17,8 +12,6 @@ ideaExcludeFolders += ".idea_modules"
 
 // Because we can't run two spark contexts on same VM
 parallelExecution in Test := false
-
-libraryDependencies ++= Seq()
 
 libraryDependencies += ("org.apache.spark" %% "spark-core" % "1.2.1" % "provided").exclude("org.apache.hadoop", "hadoop-client")
 

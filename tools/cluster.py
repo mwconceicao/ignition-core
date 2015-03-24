@@ -35,16 +35,16 @@ log.addHandler(handler)
 
 script_path = os.path.dirname(os.path.realpath(__file__))
 
-default_instance_type = 'r3.2xlarge'
+default_instance_type = 'r3.xlarge'
 default_spot_price = '0.10'
-default_worker_instances = '2'
+default_worker_instances = '1'
 default_master_instance_type = 'm3.xlarge'
 default_region = 'us-east-1'
 default_zone = default_region + 'b'
 default_key_id = 'ignition_key'
 default_key_file = os.path.expanduser('~/.ssh/ignition_key.pem')
-default_ami = 'ami-35b1885c'  # HVM AMI
-default_master_ami = 'ami-5bb18832'  # PVM AMI
+default_ami = None # will be decided based on spark-ec2 list
+default_master_ami = None
 default_env = 'dev'
 default_spark_version = 'https://circle-artifacts.com/gh/chaordic/spark/3/artifacts/0/tmp/circle-artifacts.zAWvGZt/spark-1.2.2-SNAPSHOT-bin-1.0.4.tgz'
 default_spark_repo = 'https://github.com/chaordic/spark'
@@ -250,15 +250,14 @@ def launch(cluster_name, slaves,
                 '--subnet-id', vpc_subnet,
             ])
 
-        spot_params = ['--spot-price', spot_price]
-        if ondemand:
-            spot_params = []
+        spot_params = ['--spot-price', spot_price] if not ondemand else []
+        ami_params = ['--ami', ami] if ami else []
+        master_ami_params = ['--master-ami', master_ami] if master_ami else []
+
         for i in range(retries_on_same_cluster):
             log.info('Running script, try %d of %d', i + 1, retries_on_same_cluster)
             try:
-                call_ec2_script(['--ami', ami,
-                                 '--master-ami', master_ami,
-                                 '--identity-file', key_file,
+                call_ec2_script(['--identity-file', key_file,
                                  '--key-pair', key_id,
                                  '--slaves', slaves,
                                  '--region', region,
@@ -277,7 +276,9 @@ def launch(cluster_name, slaves,
                                  'launch', cluster_name] +
                                 spot_params +
                                 resume_param +
-                                auth_params,
+                                auth_params +
+                                ami_params +
+                                master_ami_params,
                                 timeout_total_minutes=script_timeout_total_minutes,
                                 timeout_inactivity_minutes=script_timeout_inactivity_minutes)
                 success = True
