@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package ignition.spark
+package ignition.core.testsupport.spark
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, Suite}

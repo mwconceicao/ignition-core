@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package ignition.spark
+package ignition.core.testsupport.spark
 
 import _root_.io.netty.util.internal.logging.{InternalLoggerFactory, Slf4JLoggerFactory}
 import org.apache.spark.SparkContext

@@ -1,6 +1,6 @@
 package ignition.core.jobs.utils
 
-import ignition.spark.SharedSparkContext
+import ignition.core.testsupport.spark.SharedSparkContext
 import ignition.core.jobs.utils.RDDUtils._
 import org.scalatest._
 
