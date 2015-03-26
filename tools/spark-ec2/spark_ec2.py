@@ -335,23 +335,23 @@ EC2_INSTANCE_TYPES = {
 
 
 # Attempt to resolve an appropriate AMI given the architecture and region of the request.
-def get_spark_ami(opts):
-    if opts.instance_type in EC2_INSTANCE_TYPES:
-        instance_type = EC2_INSTANCE_TYPES[opts.instance_type]
+def get_spark_ami(instance_type, region, spark_ec2_git_repo, spark_ec2_git_branch):
+    if instance_type in EC2_INSTANCE_TYPES:
+        instance_type = EC2_INSTANCE_TYPES[instance_type]
     else:
         instance_type = "pvm"
         print >> stderr,\
-            "Don't recognize %s, assuming type is pvm" % opts.instance_type
+            "Don't recognize %s, assuming type is pvm" % instance_type
 
     # URL prefix from which to fetch AMI information
     ami_prefix = "{r}/{b}/ami-list".format(
-        r=opts.spark_ec2_git_repo.replace("https://github.com", "https://raw.github.com", 1),
-        b=opts.spark_ec2_git_branch)
+        r=spark_ec2_git_repo.replace("https://github.com", "https://raw.github.com", 1),
+        b=spark_ec2_git_branch)
 
-    ami_path = "%s/%s/%s" % (ami_prefix, opts.region, instance_type)
+    ami_path = "%s/%s/%s" % (ami_prefix, region, instance_type)
     try:
         ami = urllib2.urlopen(ami_path).read().strip()
-        print "Spark AMI: " + ami
+        print "Spark AMI for %s: %s" % (instance_type, ami)
     except:
         print >> stderr, "Could not resolve AMI at: " + ami_path
         sys.exit(1)
@@ -447,10 +447,10 @@ def launch_cluster(conn, opts, cluster_name):
 
     # Figure out Spark AMI
     if opts.ami is None:
-        opts.ami = get_spark_ami(opts)
+        opts.ami = get_spark_ami(opts.instance_type, opts.region, opts.spark_ec2_git_repo, opts.spark_ec2_git_branch)
 
     if opts.master_ami is None:
-        opts.master_ami = opts.ami
+        opts.master_ami = get_spark_ami(opts.master_instance_type, opts.region, opts.spark_ec2_git_repo, opts.spark_ec2_git_branch) 
 
     # we use group ids to work around https://github.com/boto/boto/issues/350
     additional_group_ids = []
@@ -1076,20 +1076,6 @@ def real_main():
             print >> stderr, \
                 "Warning: Unrecognized EC2 instance type for master-instance-type: {t}".format(
                     t=opts.master_instance_type)
-        # Since we try instance types even if we can't resolve them, we check if they resolve first
-        # and, if they do, see if they resolve to the same virtualization type.
-        if opts.instance_type in EC2_INSTANCE_TYPES and \
-           opts.master_instance_type in EC2_INSTANCE_TYPES:
-            if EC2_INSTANCE_TYPES[opts.instance_type] != \
-               EC2_INSTANCE_TYPES[opts.master_instance_type]:
-                print >> stderr, \
-                    "Error: spark-ec2 currently does not support having a master and slaves with " + \
-                    "different AMI virtualization types."
-                print >> stderr, "master instance virtualization type: {t}".format(
-                    t=EC2_INSTANCE_TYPES[opts.master_instance_type])
-                print >> stderr, "slave instance virtualization type: {t}".format(
-                    t=EC2_INSTANCE_TYPES[opts.instance_type])
-                sys.exit(1)
 
     if opts.ebs_vol_num > 8:
         print >> stderr, "ebs-vol-num cannot be greater than 8"
