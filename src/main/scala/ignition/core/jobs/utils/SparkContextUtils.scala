@@ -96,10 +96,6 @@ object SparkContextUtils {
 
 
 
-    val dummyDateExtractor = new PathDateExtractor {
-      override def extractFromPath(path: String): DateTime = throw new Exception("No date extractor implemented")
-    }
-
     def getFilteredPaths(paths: Seq[String],
                          requireSuccess: Boolean,
                          inclusiveStartDate: Boolean,

@@ -17,7 +17,7 @@ class S3Client {
 //    properties.put("httpclient.retry-max", "10") // How many times to retry connections when they fail with IO errors
 //    properties.put("httpclient.socket-timeout-ms", "30000") // How many milliseconds to wait before a connection times out. 0 means infinity.
 
-    jets3tProperties.loadAndReplaceProperties(properties, "chaordic'")
+    jets3tProperties.loadAndReplaceProperties(properties, "ignition'")
     jets3tProperties
   }
 
