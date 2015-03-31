@@ -46,7 +46,7 @@ default_key_file = os.path.expanduser('~/.ssh/ignition_key.pem')
 default_ami = 'ami-35b1885c'  # HVM AMI
 default_master_ami = 'ami-5bb18832'  # PVM AMI
 default_env = 'dev'
-default_spark_version = 'https://circle-artifacts.com/gh/chaordic/spark/3/artifacts/0/tmp/circle-artifacts.zAWvGZt/spark-1.2.2-SNAPSHOT-bin-1.0.4.tgz'
+default_spark_version = 'http://www.us.apache.org/dist/spark/spark-1.3.0/spark-1.3.0-bin-cdh4.tgz'
 default_spark_repo = 'https://github.com/chaordic/spark'
 default_remote_user = 'ec2-user'
 default_remote_control_dir = '/tmp/Ignition'
@@ -207,7 +207,7 @@ def launch(cluster_name, slaves,
            vpc = None,
            vpc_subnet = None,
            master_instance_type=default_master_instance_type,
-           wait_time='180', hadoop_major_version='1',
+           wait_time='180', hadoop_major_version='2',
            worker_instances=default_worker_instances, retries_on_same_cluster=5,
            max_clusters_to_create=5,
            minimum_percentage_healthy_slaves=0.9,
