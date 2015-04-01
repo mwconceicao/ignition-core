@@ -28,7 +28,7 @@ object SparkContextUtils {
       for {
         path <- paths
         status <- Option(fs.globStatus(path)).getOrElse(Array.empty).toSeq
-        if status.isDir || !removeEmpty || status.getLen > 0 // remove empty files if necessary
+        if status.isDirectory || !removeEmpty || status.getLen > 0 // remove empty files if necessary
       } yield status
     }
 
@@ -58,8 +58,7 @@ object SparkContextUtils {
     }
 
     private def processTextFiles(paths: Seq[String], minimumPaths: Int): RDD[String] = {
-      val minPartitions = 256 // FIXME: work around some buggy hadoop clients versions which don't split at all
-      processPaths((p) => sc.textFile(p, minPartitions), paths, minimumPaths)
+      processPaths((p) => sc.textFile(p), paths, minimumPaths)
     }
 
     private def filterPaths(paths: Seq[String],
@@ -117,7 +116,7 @@ object SparkContextUtils {
       def mapPaths(actionWhenNeedsSynching: (String, String) => Unit): Seq[String] = {
         paths.map(p => {
           val hdfsPath = p.replace("s3n://", hdfsPathPrefix)
-          if (forceSynch || getStatus(hdfsPath, false).isEmpty || getStatus(s"$hdfsPath/*", true).filterNot(_.isDir).size != filesToOutput) {
+          if (forceSynch || getStatus(hdfsPath, false).isEmpty || getStatus(s"$hdfsPath/*", true).filterNot(_.isDirectory).size != filesToOutput) {
             val _hdfsPath = new Path(hdfsPath)
             actionWhenNeedsSynching(p, hdfsPath)
           }
