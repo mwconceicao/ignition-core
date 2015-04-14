@@ -333,6 +333,11 @@ EC2_INSTANCE_TYPES = {
     "t2.medium":   "hvm",
     "t2.micro":    "hvm",
     "t2.small":    "hvm",
+    "d2.2xlarge":  "hvm",
+    "d2.4xlarge":  "hvm",
+    "d2.8xlarge":  "hvm",
+    "d2.large":    "hvm",
+    "d2.xlarge":   "hvm",
 }
 
 
@@ -485,13 +490,12 @@ def launch_cluster(conn, opts, cluster_name):
             device.delete_on_termination = True
             block_map["/dev/sd" + chr(ord('s') + i)] = device
 
-    # AWS ignores the AMI-specified block device mapping for M3 (see SPARK-3342).
-    if opts.instance_type.startswith('m3.'):
+    # AWS ignores the AMI-specified block device mapping for M3 or cc2 (see SPARK-3342).
+    if opts.instance_type.startswith('m3.') or opts.instance_type.startswith('cc2.'):
         for i in range(get_num_disks(opts.instance_type)):
             dev = BlockDeviceType()
             dev.ephemeral_name = 'ephemeral%d' % i
-            # The first ephemeral drive is /dev/sdb.
-            name = '/dev/sd' + string.letters[i + 1]
+            name = '/dev/xvd' + string.letters[i + 1]
             block_map[name] = dev
 
     # Launch slaves
@@ -844,6 +848,10 @@ def get_num_disks(instance_type):
         "r3.large":    1,
         "r3.xlarge":   1,
         "t1.micro":    0,
+        'd2.xlarge':   3,
+        'd2.2xlarge':  6,
+        'd2.4xlarge':  12,
+        'd2.8xlarge':  24,
     }
     if instance_type in disks_by_instance:
         return disks_by_instance[instance_type]
