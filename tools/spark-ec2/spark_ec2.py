@@ -490,13 +490,11 @@ def launch_cluster(conn, opts, cluster_name):
             device.delete_on_termination = True
             block_map["/dev/sd" + chr(ord('s') + i)] = device
 
-    # AWS ignores the AMI-specified block device mapping for M3 or cc2 (see SPARK-3342).
-    if opts.instance_type.startswith('m3.') or opts.instance_type.startswith('cc2.'):
-        for i in range(get_num_disks(opts.instance_type)):
-            dev = BlockDeviceType()
-            dev.ephemeral_name = 'ephemeral%d' % i
-            name = '/dev/xvd' + string.letters[i + 1]
-            block_map[name] = dev
+    for i in range(get_num_disks(opts.instance_type)):
+        dev = BlockDeviceType()
+        dev.ephemeral_name = 'ephemeral%d' % i
+        name = '/dev/xvd' + string.letters[i + 1]
+        block_map[name] = dev
 
     # Launch slaves
     if opts.spot_price is not None:
