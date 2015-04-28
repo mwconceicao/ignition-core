@@ -77,7 +77,10 @@ object CoreJobRunner {
       
       val sc = new SparkContext(sparkConf)
 
-      // Try to propagate config values to worker
+      // Add logging context to driver
+      setLoggingContextValues(config)
+
+      // Also try to propagate logging context to workers
       // TODO: find a more efficient and bullet-proof way
       val configBroadCast = sc.broadcast(config)
       sc.parallelize(Range(1, 2000), numSlices = 2000).foreachPartition(_ => setLoggingContextValues(configBroadCast.value))
