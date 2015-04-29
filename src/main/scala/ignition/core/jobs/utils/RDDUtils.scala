@@ -85,7 +85,7 @@ object RDDUtils {
       rdd.aggregateByKey(List.empty[V])(
         (lst, v) =>
           if (lst.size >= n) {
-            logger.warn(s"Ignoring value '{}' due aggregation result of size '{}' is bigger then n = '{}'", v, lst.size, n)
+            logger.warn(s"Ignoring value '$v' due aggregation result of size '${lst.size}' is bigger then n = '$n'")
             lst
           } else {
             v :: lst
@@ -97,7 +97,7 @@ object RDDUtils {
             lstB
           else {
             if (lstA.size + lstB.size > n) {
-              logger.warn(s"Merging partition1={} with partition2={} and taking the first n={}, sample='{}'", lstA.size, lstB.size, n, lstB.take(5))
+              logger.warn(s"Merging partition1=${lstA.size} with partition2=${lstB.size} and taking the first n=$n, sample1='${lstA.take(5)}', sample2='${lstB.take(5)}'")
               (lstA ++ lstB).take(n)
             } else
               lstA ++ lstB
