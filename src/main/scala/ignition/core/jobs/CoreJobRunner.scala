@@ -75,10 +75,10 @@ object CoreJobRunner {
 
       jobConf.foreach { case (k, v) => sparkConf.set(k, v) }
 
-      val sc = new SparkContext(sparkConf)
-
       // Add logging context to driver
       setLoggingContextValues(config)
+      
+      val sc = new SparkContext(sparkConf)
 
       // Also try to propagate logging context to workers
       // TODO: find a more efficient and bullet-proof way
