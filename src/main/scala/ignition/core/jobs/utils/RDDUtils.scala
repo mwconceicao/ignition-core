@@ -14,7 +14,7 @@ import scalaz.{Success, Validation}
 
 object RDDUtils {
 
-  private lazy val logger = LoggerFactory.getLogger("ignition.RDDUtils")
+  private lazy val logger = LoggerFactory.getLogger("ignition.core.RDDUtils")
 
   //TODO: try to make it work for any collection
   implicit class OptionRDDImprovements[V: ClassTag](rdd: RDD[Option[V]]) {
@@ -85,21 +85,22 @@ object RDDUtils {
       rdd.aggregateByKey(List.empty[V])(
         (lst, v) =>
           if (lst.size >= n) {
-            logger.warn(s"Ignoring value '$v' due aggregation result of size '${lst.size}' is bigger then n = '$n'")
+            logger.warn(s"Ignoring value '{}' due aggregation result of size '{}' is bigger then n = '{}'", v, lst.size, n)
             lst
           } else {
             v :: lst
           },
         (lstA, lstB) =>
-          if (lstA.size >= n) {
-            logger.warn(s"First partition crossed the threshold, ignoring ${lstB.size} rows of second partition")
+          if (lstA.size >= n)
             lstA
-          } else if (lstB.size >= n) {
-            logger.warn(s"Second partition crossed the threshold, ignoring ${lstA.size} rows of first partition")
+          else if (lstB.size >= n)
             lstB
-          } else {
-            logger.warn(s"Merging partition1={${lstA.size}} with partition2={${lstB.size}} and taking the first n={$n}")
-            (lstA ++ lstB).take(n)
+          else {
+            if (lstA.size + lstB.size > n) {
+              logger.warn(s"Merging partition1={} with partition2={} and taking the first n={}, sample='{}'", lstA.size, lstB.size, n, lstB.take(5))
+              (lstA ++ lstB).take(n)
+            } else
+              lstA ++ lstB
           }
       )
 
