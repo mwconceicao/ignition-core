@@ -1,5 +1,7 @@
 package ignition.core.jobs.utils
 
+import org.slf4j.LoggerFactory
+
 import scala.reflect._
 import org.apache.spark.rdd.{PairRDDFunctions, CoGroupedRDD, RDD}
 import org.apache.spark.SparkContext._
@@ -11,6 +13,9 @@ import org.joda.time.format.DateTimeFormat
 import scalaz.{Success, Validation}
 
 object RDDUtils {
+
+  private lazy val logger = LoggerFactory.getLogger("ignition.RDDUtils")
+
   //TODO: try to make it work for any collection
   implicit class OptionRDDImprovements[V: ClassTag](rdd: RDD[Option[V]]) {
     def flatten: RDD[V] = {
@@ -78,8 +83,24 @@ object RDDUtils {
     // TODO: add an way to log if we reach the limit
     def groupByKeyAndTake(n: Int): RDD[(K, List[V])] =
       rdd.aggregateByKey(List.empty[V])(
-        (lst, v) => if (lst.size >= n) lst else v :: lst,
-        (lstA, lstB) => if (lstA.size >= n) lstA else if (lstB.size >= n) lstB else (lstA ++ lstB).take(n)
+        (lst, v) =>
+          if (lst.size >= n) {
+            logger.warn(s"Ignoring value '$v' due aggregation result of size '${lst.size}' is bigger then n = '$n'")
+            lst
+          } else {
+            v :: lst
+          },
+        (lstA, lstB) =>
+          if (lstA.size >= n) {
+            logger.warn(s"First partition crossed the threshold, ignoring ${lstB.size} rows of second partition")
+            lstA
+          } else if (lstB.size >= n) {
+            logger.warn(s"Second partition crossed the threshold, ignoring ${lstA.size} rows of first partition")
+            lstB
+          } else {
+            logger.warn(s"Merging partition1={${lstA.size}} with partition2={${lstB.size}} and taking the first n={$n}")
+            (lstA ++ lstB).take(n)
+          }
       )
 
     // Note: completely unoptimized. We could use instead for better performance:
