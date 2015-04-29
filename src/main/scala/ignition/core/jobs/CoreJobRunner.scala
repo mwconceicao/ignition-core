@@ -74,7 +74,7 @@ object CoreJobRunner {
       defaultSparkConfMap.foreach { case (k, v) => sparkConf.set(k, v) }
 
       jobConf.foreach { case (k, v) => sparkConf.set(k, v) }
-      
+
       val sc = new SparkContext(sparkConf)
 
       // Add logging context to driver
