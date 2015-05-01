@@ -1,18 +1,32 @@
 package ignition.core.utils
-import scala.collection.IterableLike
+import scala.collection.{TraversableLike, IterableLike}
 import scala.collection.generic.CanBuildFrom
 import scala.language.implicitConversions
-import scalaz._
+import scalaz.Validation
 
 object CollectionUtils {
 
-  implicit class RichCollection[A, Repr](xs: IterableLike[A, Repr]){
+  implicit class TraversableOnceImprovements[A](xs: TraversableOnce[A]) {
+    def maxByOption[B](f: A => B)(implicit cmp: Ordering[B]): Option[A] = {
+      if (xs.isEmpty)
+        None
+      else
+        Option(xs.maxBy(f))
+    }
+
+    def minByOption[B](f: A => B)(implicit cmp: Ordering[B]): Option[A] = {
+      if (xs.isEmpty)
+        None
+      else
+        Option(xs.minBy(f))
+    }
+  }
+
+  implicit class TraversableLikeImprovements[A, Repr](xs: TraversableLike[A, Repr]) {
     def distinctBy[B, That](f: A => B)(implicit cbf: CanBuildFrom[Repr, A, That]) = {
       val builder = cbf(xs.repr)
-      val i = xs.iterator
-      var set = Set[B]()
-      while(i.hasNext) {
-        val o = i.next
+      val set = collection.mutable.Set.empty[B]
+      xs.foreach { o =>
         val b = f(o)
         if (!set(b)) {
           set += b
@@ -26,7 +40,7 @@ object CollectionUtils {
   implicit class ValidatedIterableLike[T, R, Repr <: IterableLike[Validation[R, T], Repr]](seq: IterableLike[Validation[R, T], Repr]) {
     def mapSuccess[That](f: T => Validation[R, T])(implicit cbf: CanBuildFrom[Repr, Validation[R, T], That]): That = {
       seq.map({
-        case Success(v) => f(v)
+        case scalaz.Success(v) => f(v)
         case failure => failure
       })
     }
