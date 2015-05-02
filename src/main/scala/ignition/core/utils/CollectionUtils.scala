@@ -35,6 +35,29 @@ object CollectionUtils {
       }
       builder.result
     }
+
+    // Remove consecutive duplicated elements
+    def compress[That](implicit cbf: CanBuildFrom[Repr, A, That]): That = {
+      compressBy(identity)
+    }
+
+    // Remove consecutive duplicated elements using a criteria given by a function
+    def compressBy[B, That](f: A => B)(implicit cbf: CanBuildFrom[Repr, A, That]): That = {
+      val builder = cbf(xs.repr)
+      val i = xs.toIterator
+
+      if (i.isEmpty)
+        builder.result
+      else {
+        val first = i.next()
+        builder += first
+        (Iterator(first) ++ i)
+          .sliding(2)
+          .foreach { case Seq(a, b) => if (f(a) != f(b)) builder += b }
+      }
+      builder.result
+    }
+
   }
 
   implicit class ValidatedIterableLike[T, R, Repr <: IterableLike[Validation[R, T], Repr]](seq: IterableLike[Validation[R, T], Repr]) {

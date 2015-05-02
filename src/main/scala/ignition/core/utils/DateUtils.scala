@@ -1,12 +1,13 @@
 package ignition.core.utils
 
-import org.joda.time.{DateTimeZone, DateTime}
+import org.joda.time.{Period, DateTimeZone, DateTime}
 import org.joda.time.format.ISODateTimeFormat
 
 object DateUtils {
   private val isoDateTimeFormatter = ISODateTimeFormat.dateTime()
 
   implicit def dateTimeOrdering: Ordering[DateTime] = Ordering.fromLessThan(_ isBefore _)
+  implicit def periodOrdering: Ordering[Period] = Ordering.fromLessThan(_.toStandardSeconds.getSeconds <  _.toStandardSeconds.getSeconds)
 
   implicit class DateTimeImprovements(val dateTime: DateTime) {
     def toIsoString = isoDateTimeFormatter.print(dateTime)
