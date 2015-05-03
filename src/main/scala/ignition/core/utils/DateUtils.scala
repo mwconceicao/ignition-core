@@ -4,7 +4,7 @@ import org.joda.time.{Period, DateTimeZone, DateTime}
 import org.joda.time.format.ISODateTimeFormat
 
 object DateUtils {
-  private val isoDateTimeFormatter = ISODateTimeFormat.dateTime()
+  private val isoDateTimeFormatter = ISODateTimeFormat.dateTime().withZoneUTC()
 
   implicit def dateTimeOrdering: Ordering[DateTime] = Ordering.fromLessThan(_ isBefore _)
   implicit def periodOrdering: Ordering[Period] = Ordering.fromLessThan(_.toStandardSeconds.getSeconds <  _.toStandardSeconds.getSeconds)

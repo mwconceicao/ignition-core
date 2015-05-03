@@ -51,7 +51,8 @@ object CollectionUtils {
       else {
         val first = i.next()
         builder += first
-        (Iterator(first) ++ i)
+        // use first two times so we can handle the corner case where we have only one element in collection
+        (Iterator(first, first) ++ i)
           .sliding(2)
           .foreach { case Seq(a, b) => if (f(a) != f(b)) builder += b }
       }
