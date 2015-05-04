@@ -80,7 +80,6 @@ object RDDUtils {
       }, preservesPartitioning = true)
     }
 
-    // TODO: add an way to log if we reach the limit
     def groupByKeyAndTake(n: Int): RDD[(K, List[V])] =
       rdd.aggregateByKey(List.empty[V])(
         (lst, v) =>
