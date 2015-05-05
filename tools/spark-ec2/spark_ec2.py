@@ -535,7 +535,7 @@ def launch_cluster(conn, opts, cluster_name):
                 active_instance_ids = filter(lambda req: req.state == "active", reqs)
                 invalid_states = ["capacity-not-available", "capacity-oversubscribed", "price-too-low"]
                 invalid = filter(lambda req: req.status.code in invalid_states, reqs)
-                if len(invalid > 0):
+                if len(invalid) > 0:
                     raise Exception("Invalid state for spot request: %s - status: %s" %
                         (invalid[0].id, invalid[0].status.message))
                 if len(active_instance_ids) == opts.slaves:
