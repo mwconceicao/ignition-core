@@ -213,6 +213,9 @@ def parse_args():
     parser.add_option(
         "--vpc-id", default=None,
         help="VPC to launch instances in")
+    parser.add_option(
+        "--spot-timeout", type="int", default=45,
+        help="Maximum amount of time (in minutes) to wait for spot requests to be fulfilled")
 
     (opts, args) = parser.parse_args()
     if len(args) != 2:
@@ -523,18 +526,18 @@ def launch_cluster(conn, opts, cluster_name):
             my_req_ids += [req.id for req in slave_reqs]
             i += 1
 
-        print "Waiting for spot instances to be granted..."
+        start_time = datetime.now()
+        print "Waiting for spot instances to be granted... Request IDs: %s " % my_req_ids
         try:
             while True:
                 time.sleep(10)
-                reqs = conn.get_all_spot_instance_requests()
-                id_to_req = {}
-                for r in reqs:
-                    id_to_req[r.id] = r
-                active_instance_ids = []
-                for i in my_req_ids:
-                    if i in id_to_req and id_to_req[i].state == "active":
-                        active_instance_ids.append(id_to_req[i].instance_id)
+                reqs = conn.get_all_spot_instance_requests(my_req_ids)
+                active_instance_ids = filter(lambda req: req.state == "active", reqs)
+                invalid_states = ["capacity-not-available", "capacity-oversubscribed", "price-too-low"]
+                invalid = filter(lambda req: req.status.code in invalid_states, reqs)
+                if len(invalid > 0):
+                    raise Exception("Invalid state for spot request: %s - status: %s" %
+                        (invalid[0].id, invalid[0].status.message))
                 if len(active_instance_ids) == opts.slaves:
                     print "All %d slaves granted" % opts.slaves
                     reservations = conn.get_all_reservations(active_instance_ids)
@@ -545,7 +548,11 @@ def launch_cluster(conn, opts, cluster_name):
                 else:
                     print "%d of %d slaves granted, waiting longer" % (
                         len(active_instance_ids), opts.slaves)
+
+                if (datetime.now() - start_time).seconds > opts.spot_timeout * 60:
+                    raise Exception("Timed out while waiting for spot instances")
         except:
+            print "Error: %s" % sys.exc_info()[1]
             print "Canceling spot instance requests"
             conn.cancel_spot_instance_requests(my_req_ids)
             # Log a warning if any of these requests actually launched instances:
