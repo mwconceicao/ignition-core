@@ -213,6 +213,9 @@ def parse_args():
     parser.add_option(
         "--vpc-id", default=None,
         help="VPC to launch instances in")
+    parser.add_option(
+        "--spot-timeout", type="int", default=45,
+        help="Maximum amount of time (in minutes) to wait for spot requests to be fulfilled")
 
     (opts, args) = parser.parse_args()
     if len(args) != 2:
@@ -544,7 +547,7 @@ def launch_cluster(conn, opts, cluster_name):
                     print "%d of %d slaves granted, waiting longer" % (
                         len(active_instance_ids), opts.slaves)
 
-                if (datetime.now() - start_time).seconds > (45*60):
+                if (datetime.now() - start_time).seconds > opts.spot_timeout * 60:
                     raise Exception("Timed out while waiting for spot instances")
         except:
             print "Error: %s" % sys.exc_info()[1]
