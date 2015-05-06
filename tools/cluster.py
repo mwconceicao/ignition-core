@@ -612,9 +612,9 @@ def wait_for_job(cluster_name, job_name, job_tag, key_file=default_key_file,
                 failures += 1
                 last_failure = 'Control missing'
             elif output == 'KILLED':
-                log.warn('Job has been killed before finishing')
+                log.error('Job has been killed before finishing')
                 collect(show_tail=True)
-                break
+                raise JobFailure('Job has been killed before finishing')
             elif output == 'RUNNING':
                 log.info('Job is running...')
             else:
