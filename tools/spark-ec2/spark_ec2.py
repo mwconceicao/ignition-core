@@ -540,7 +540,7 @@ def launch_cluster(conn, opts, cluster_name):
                         (invalid[0].id, invalid[0].status.message))
                 if len(active_instance_ids) == opts.slaves:
                     print "All %d slaves granted" % opts.slaves
-                    reservations = conn.get_all_reservations(active_instance_ids)
+                    reservations = conn.get_all_reservations([r.instance_id for r in active_instance_ids])
                     slave_nodes = []
                     for r in reservations:
                         slave_nodes += r.instances
