@@ -130,6 +130,13 @@ object SparkContextUtils {
     }
 
 
+    def getTextFiles(paths: Seq[String], synchLocally: Boolean = false, forceSynch: Boolean = false, minimumPaths: Int = 1): RDD[String] = {
+      if (synchLocally)
+        processTextFiles(synchToHdfs(paths, processTextFiles, forceSynch), minimumPaths)
+      else
+        processTextFiles(paths, minimumPaths)
+    }
+
     def filterAndGetTextFiles(path: String,
                               requireSuccess: Boolean = false,
                               inclusiveStartDate: Boolean = true,
@@ -144,10 +151,7 @@ object SparkContextUtils {
       val paths = getFilteredPaths(Seq(path), requireSuccess, inclusiveStartDate, startDate, inclusiveEndDate, endDate, lastN, ignoreMalformedDates)
       if (paths.size < minimumPaths)
         throw new Exception(s"Tried with start/end time equals to $startDate/$endDate for path $path but but the resulting number of paths $paths is less than the required")
-      else if (synchLocally)
-        processTextFiles(synchToHdfs(paths, processTextFiles, forceSynch), minimumPaths)
-      else
-        processTextFiles(paths, minimumPaths)
+      getTextFiles(paths, synchLocally, forceSynch, minimumPaths)
     }
 
     private def stringHadoopFile(paths: Seq[String], minimumPaths: Int): RDD[Try[String]] = {
