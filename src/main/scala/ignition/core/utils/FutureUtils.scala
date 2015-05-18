@@ -1,9 +1,11 @@
 package ignition.core.utils
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking, future}
 import scala.util.{Failure, Success}
 
 object FutureUtils {
+
+  def blockingFuture[T](body: =>T)(implicit ec: ExecutionContext): Future[T] = future { blocking { body } }
 
   implicit class FutureImprovements[V](future: Future[V]) {
     def toOptionOnFailure(errorHandler: (Throwable) => Option[V])(implicit ec: ExecutionContext): Future[Option[V]] = {
