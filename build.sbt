@@ -17,7 +17,7 @@ libraryDependencies += ("org.apache.spark" %% "spark-core" % "1.3.0" % "provided
 
 libraryDependencies += ("org.apache.hadoop" % "hadoop-client" % "2.0.0-cdh4.7.1" % "provided")
 
-libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.0"
+libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.1.3"
 
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "0.3.16"
 
