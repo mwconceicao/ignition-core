@@ -1,3 +1,6 @@
 [submodule "core"]
 	path = core
 	url = git@github.com:chaordic/ignition-core.git
+[submodule "chaordic"]
+	path = chaordic
+	url = git@github.com:chaordic/ignition-chaordic.git

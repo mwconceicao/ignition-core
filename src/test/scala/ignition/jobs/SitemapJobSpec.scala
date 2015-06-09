@@ -2,6 +2,7 @@ package ignition.jobs
 
 import ignition.chaordic.Chaordic
 import ignition.chaordic.pojo.Parsers.ProductV2Parser
+import org.joda.time.DateTime
 import org.scalatest.{ShouldMatchers, FlatSpec}
 
 class SitemapJobSpec extends FlatSpec with ShouldMatchers {
@@ -119,7 +120,7 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers {
                                  """.stripMargin)
 
   "Search" should "create link for product" in {
-    val links = SitemapJob.generateLink(p)
+    val links = SitemapXMLJob.generateLink(p, "teste", List(Set("publisher")))
     links shouldBe Seq.empty
   }
 }
