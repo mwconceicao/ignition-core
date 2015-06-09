@@ -12,7 +12,9 @@ object Runner {
     ("HelloWorldSetup", (context => HelloWorldSetup.run(context), Map.empty)),
     ("WordCountSetup", (context => WordCountSetup.run(context), Map.empty)),
     // Main jobs
+    ("SitemapXMLSetup", (context => SitemapXMLSetup.run(context), Map.empty)),
     ("AnotherSetup", (context => WordCountSetup.run(context), Map.empty)) // FIXME
+
   )
 
 

@@ -5,8 +5,8 @@ object IgnitionBuild extends Build {
 
 
   lazy val root = project.in(file("."))
-    .dependsOn(file("core"))
-    .aggregate(file("core"))
+    .dependsOn(file("chaordic"))
+    .aggregate(file("chaordic"))
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
     .settings(
       name := "ignition-template",
