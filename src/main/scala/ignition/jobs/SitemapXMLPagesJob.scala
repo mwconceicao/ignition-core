@@ -44,7 +44,7 @@ object SearchClickLogParser extends JsonParser[SearchClickLog] {
 
 object SitemapXMLJob {
   case class Config(baseHost: String = "", generatePages: Boolean = false, generateSearch: Boolean = false,
-                    pagesBaseHost: String = "", detailsKeys: Set[String] = Set.empty)
+                    detailsKeys: Set[String] = Set.empty)
 
   def encode(s: String): String = URLEncoder.encode(s, "UTF-8")
 
@@ -76,8 +76,11 @@ object SitemapXMLJob {
 
 object SitemapXMLSearchJob {
 
-  def generateSearchURLXMLs(sc: SparkContext, searchLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog], config: Config,
-                       now: DateTime) = {
+  def generateSearchURLXMLs(sc: SparkContext,
+                            now: DateTime,
+                            searchLogs: RDD[SearchLog],
+                            clickLogs: RDD[SearchClickLog],
+                            config: Config): RDD[String] = {
     val rankedQueries = searchLogs
       .filter(p => p.feature == "standard" && p.products.nonEmpty)
       .map(p => (p.query, 1))
@@ -141,7 +144,8 @@ object SitemapXMLPagesJob {
 
     p.categoryPaths.toList.flatMap { categories =>
       (0 until categories.size).flatMap { i =>
-        val basePath = baseHost + "/pages/" + categories.take(i + 1)
+        val prefix = baseHost + "/pages/"
+        val basePath = prefix + categories.take(i + 1)
           .flatMap(_.name)
           .map(slugify)
           .mkString("/")
@@ -157,14 +161,16 @@ object SitemapXMLPagesJob {
   def generateUrlXMLs(sc: SparkContext, _now: DateTime, products: RDD[Product], conf: Config): RDD[String] = {
     val detailsKeySets = sc.broadcast(generateDetailsKeySets(conf))
     val now = sc.broadcast(_now)
-    products.filter(p => p.status.map(_.toUpperCase) match {
-      case Some("AVAILABLE") | Some("UNAVAILABLE") => true
-      case _ => false
-    }).flatMap { product =>
-      generateLink(product, conf.pagesBaseHost, detailsKeySets.value).map { link =>
-        generateUrlXml(link, now.value, "hourly", 1)
-      }
-    }.distinct()
+    products
+      .filter(p => p.status.map(_.toUpperCase) match {
+        case Some("AVAILABLE") | Some("UNAVAILABLE") => true
+        case _ => false
+      })
+      .flatMap { product =>
+        generateLink(product, conf.baseHost, detailsKeySets.value).map { link =>
+          generateUrlXml(link, now.value, "hourly", 1)
+        }
+      }.distinct()
   }
 
 }
