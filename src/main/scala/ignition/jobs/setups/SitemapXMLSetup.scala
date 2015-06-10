@@ -28,6 +28,7 @@ object SitemapXMLSetup extends ExecutionRetry {
   def run(runnerContext: RunnerContext) {
 
     val sc = runnerContext.sparkContext
+    val config = runnerContext.config
     val now = runnerContext.config.date
 
     val clients = Set("saraiva-v5")
@@ -37,11 +38,12 @@ object SitemapXMLSetup extends ExecutionRetry {
     val numberOutputs = 1000
     clients.map { apiKey =>
       val conf = configurations.getFor(apiKey)
-      val products = parseProducts(sc.textFile(s"/tmp/products/$apiKey*"))
-      val urls = SitemapXMLJob.generateUrlXMLs(sc, products, conf)
+//      val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz", endDate = Option(now), lastN = Option(1)))
+      val products = parseProducts(sc.textFile(s"/mnt/tmp/products/$apiKey"))
+      val urls = SitemapXMLJob.generateUrlXMLs(sc, now, products, conf)
 
       val fullXMLsPerPartition = SitemapXMLJob.generateUrlSetPerPartition(urls.repartition(numberOutputs))
-      fullXMLsPerPartition.saveAsTextFile(s"/tmp/sitexmls/$apiKey", classOf[GzipCodec])
+      fullXMLsPerPartition.saveAsTextFile(s"s3n://mail-ignition/tmp/sitexmls/${config.tag}/$apiKey", classOf[GzipCodec])
     }
 
   }

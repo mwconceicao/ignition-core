@@ -50,7 +50,7 @@ object SitemapXMLJob {
 
 
   def generateLink(p: Product, baseHost: String, detailsKeySets: List[Set[String]]): Seq[String] = {
-    val encodedDetails = getDetails(p, detailsKeySets)
+    val encodedDetails = List(Option.empty[String])//getDetails(p, detailsKeySets)
 
     p.categoryPaths.toList.flatMap { categories =>
       (0 until categories.size).flatMap { i =>
@@ -78,9 +78,9 @@ object SitemapXMLJob {
     xml.toString()
   }
 
-  def generateUrlXMLs(sc: SparkContext, products: RDD[Product], conf: Config): RDD[String] = {
+  def generateUrlXMLs(sc: SparkContext, _now: DateTime, products: RDD[Product], conf: Config): RDD[String] = {
     val detailsKeySets = sc.broadcast(generateDetailsKeySets(conf))
-    val now = sc.broadcast(DateTime.now())
+    val now = sc.broadcast(_now)
     products.filter(p => p.status.map(_.toUpperCase) match {
       case Some("AVAILABLE") | Some("UNAVAILABLE") => true
       case _ => false
