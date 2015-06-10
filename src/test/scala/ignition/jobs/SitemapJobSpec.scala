@@ -120,7 +120,7 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers {
                                  """.stripMargin)
 
   "Search" should "create link for product" in {
-    val links = SitemapXMLJob.generateLink(p, "teste", List(Set("publisher")))
+    val links = SitemapXMLPagesJob.generateLink(p, "teste", List(Set("publisher")))
     links shouldBe Seq.empty
   }
 }
