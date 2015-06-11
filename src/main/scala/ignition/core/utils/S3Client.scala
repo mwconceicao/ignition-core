@@ -37,7 +37,14 @@ class S3Client {
   }
 
   def list(bucket: String, key: String): Array[S3Object] = {
-    service.listObjects(bucket, key, null, 99999L)
+    service.listObjectsChunked(bucket, key, null, 99999L, null, true).getObjects
+  }
+
+  def copyFile(sourceBucket: String, sourceKey: String, destBucket: String, destKey: String, destContentType: Option[String] = None): Unit = {
+    val destFile = new S3Object(destKey)
+    val replaceMetaData = destContentType.isDefined
+    destContentType.foreach(contentType => destFile.setContentType(contentType))
+    service.copyObject(sourceBucket, sourceKey, destBucket, destFile, replaceMetaData)
   }
 
   def fileExists(bucket: String, key: String): Boolean = {
