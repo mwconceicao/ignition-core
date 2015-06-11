@@ -6,10 +6,13 @@ import ignition.chaordic.pojo.Product
 import ignition.chaordic.utils.JobConfiguration
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.core.jobs.ExecutionRetry
+import ignition.core.utils.S3Client
 import ignition.jobs.SitemapXMLJob.Config
 import ignition.jobs._
+import ignition.core.jobs.utils.SparkContextUtils._
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.rdd.RDD
+import ignition.chaordic.utils.ChaordicPathDateExtractor._
 
 import scala.util.Success
 
@@ -34,6 +37,8 @@ object SitemapXMLSetup extends ExecutionRetry {
     val config = runnerContext.config
     val now = runnerContext.config.date
 
+    val jobOutputBucket = s"s3n://bucket/tmp/${config.setupName}"
+
     val clients = Set("saraiva-v5")
     // Config(baseHost: String, generatePages: Boolean, generateSearch: Boolean,
     //pagesBaseHost: String = "", detailsKeys: Set[String] = Set.empty)
@@ -44,31 +49,43 @@ object SitemapXMLSetup extends ExecutionRetry {
 
     val numberOutputs = 1
 
+    val willNeedSearch = configurations.values.exists(_.generateSearch)
+    val parsedClickLogs = if (willNeedSearch) parseSearchClickLogs(sc.textFile("search/clicklog")).persist() else sc.emptyRDD[SearchClickLog]
+    val parsedSearchLogs = if (willNeedSearch) parseSearchLogs(sc.textFile("search/2015-06-01")).persist() else sc.emptyRDD[SearchLog]
+
     clients.map { apiKey =>
       val conf = configurations.getFor(apiKey)
       val pageUrls = if (conf.generatePages) {
-//      val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz", endDate = Option(now), lastN = Option(1)))
+      val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz", endDate = Option(now), lastN = Option(1)))
 //      val products = parseProducts(sc.textFile(s"/tmp/products/$apiKey"))
-        val products = parseProducts(sc.textFile(s"/mnt/tmp/products/$apiKey"))
+//        val products = parseProducts(sc.textFile(s"/mnt/tmp/products/$apiKey"))
         SitemapXMLPagesJob.generateUrlXMLs(sc, now, products, conf)
-      } else
+      } else {
         sc.emptyRDD[String]
+      }
 
       val searchUrls = if (conf.generateSearch) {
-        val searchClickLogs = parseSearchClickLogs(sc.textFile("search/clicklog")).filter(_.apiKey == apiKey)
-        val searchLogs = parseSearchLogs(sc.textFile("search/2015-06-01")).filter(_.apiKey == apiKey)
+        val searchClickLogs = parsedClickLogs.filter(_.apiKey == apiKey)
+        val searchLogs = parsedSearchLogs.filter(_.apiKey == apiKey)
         SitemapXMLSearchJob.generateSearchURLXMLs(sc, now, searchLogs, searchClickLogs, conf)
-      } else
+      } else{
         sc.emptyRDD[String]
+      }
 
       val urls = pageUrls ++ searchUrls
 
+      val jobOutputPath = s"s3n://$jobOutputBucket/tmp/${config.setupName}/$apiKey/${config.tag}"
+
       val fullXMLsPerPartition = SitemapXMLJob.generateUrlSetPerPartition(urls.repartition(numberOutputs))
+      fullXMLsPerPartition.saveAsTextFile(jobOutputPath, classOf[GzipCodec])
 //      fullXMLsPerPartition.saveAsTextFile(s"s3n://mail-ignition/tmp/sitexmls/${config.tag}/$apiKey", classOf[GzipCodec])
-      fullXMLsPerPartition.saveAsTextFile(s"sitexmls/$apiKey", classOf[GzipCodec])
+//      fullXMLsPerPartition.saveAsTextFile(s"sitexmls/$apiKey", classOf[GzipCodec])
     }
+  }
 
-
-
+  def copyAndGenerateSitemapIndex(destBucket: String, destPath: String, sourceBucket: String, sourceKey: String, glob: String = "part-*"): Unit = {
+    val s3 = new S3Client
+    val srcFiles = s3.li
+//    s3.list(sourceBucket, sourceKey)(0).getKey
   }
 }
