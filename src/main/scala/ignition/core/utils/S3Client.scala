@@ -40,9 +40,13 @@ class S3Client {
     service.listObjectsChunked(bucket, key, null, 99999L, null, true).getObjects
   }
 
-  def copyFile(sourceBucket: String, sourceKey: String, destBucket: String, destKey: String, destContentType: Option[String] = None): Unit = {
+  def copyFile(sourceBucket: String, sourceKey: String,
+               destBucket: String, destKey: String,
+               destContentType: Option[String] = None,
+               destContentEncoding: Option[String] = None): Unit = {
     val destFile = new S3Object(destKey)
-    val replaceMetaData = destContentType.isDefined
+    val replaceMetaData = destContentType.isDefined || destContentEncoding.isDefined
+    destContentEncoding.foreach(encoding => destFile.setContentEncoding(encoding))
     destContentType.foreach(contentType => destFile.setContentType(contentType))
     service.copyObject(sourceBucket, sourceKey, destBucket, destFile, replaceMetaData)
   }
