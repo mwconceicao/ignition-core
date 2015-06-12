@@ -41,8 +41,8 @@ object SitemapXMLSetup extends ExecutionRetry {
     val now = runnerContext.config.date
 
     val productionUser = "root"
-    val jobOutputBucket = "bucket"
-    val finalBucket = "bucketlatest"
+    val jobOutputBucket = "chaordic-search-ignition-history"
+    val finalBucket = "chaordic-search-ignition-latest"
     val finalBucketPrefix = "sitemaps"
 
 
@@ -51,19 +51,28 @@ object SitemapXMLSetup extends ExecutionRetry {
     //pagesBaseHost: String = "", detailsKeys: Set[String] = Set.empty)
     val configurations = new JobConfiguration(Config(),
       Map("saraiva-v5" -> Config(baseHost="http://busca.saraiva.com.br",
-                                 generatePages=true, generateSearch=false,
+                                 generatePages=true, generateSearch=true,
                                  detailsKeys=Set("ratings", "publisher", "brand", "ano", "produtoDigital"))))
 
     val numberOutputs = 10
 
     val willNeedSearch = configurations.values.exists(_.generateSearch)
-    val parsedClickLogs = if (willNeedSearch) parseSearchClickLogs(sc.textFile("search/clicklog")).persist() else sc.emptyRDD[SearchClickLog]
-    val parsedSearchLogs = if (willNeedSearch) parseSearchLogs(sc.textFile("search/2015-06-01")).persist() else sc.emptyRDD[SearchLog]
+    val parsedClickLogs = if (willNeedSearch)
+      parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
+        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist()
+    else
+      sc.emptyRDD[SearchClickLog]
+    val parsedSearchLogs = if (willNeedSearch)
+      parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
+        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist()
+    else
+      sc.emptyRDD[SearchLog]
 
     clients.foreach { apiKey =>
       val conf = configurations.getFor(apiKey)
       val pageUrls = if (conf.generatePages) {
-      val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz", endDate = Option(now), lastN = Option(1)))
+      val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz",
+        endDate = Option(now), lastN = Option(1)).repartition(500))
         SitemapXMLPagesJob.generateUrlXMLs(sc, now, products, conf)
       } else {
         sc.emptyRDD[String]

@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import os, sys, collections, itertools, logging, traceback, subprocess, datetime, base64, pickle, time, uuid, json
 import boto.ec2
-import librato, graypy
+#import librato, graypy
 import requests
 import math
 script_path = os.path.dirname(os.path.realpath(__file__))
 user_data_script = os.path.join(script_path, 'user_data_ansible_pull.sh')
-sys.path.insert(0, os.path.join(script_path, 'core', 'tools'))
+sys.path.insert(0, os.path.join(script_path, '..', 'core', 'tools'))
 import cluster
 
 ## Pseudo-types definition
@@ -15,7 +15,7 @@ RegionConf = collections.namedtuple('RegionConf', ['region', 'ami_pvm', 'ami_hvm
 FullConf = collections.namedtuple('FullConf', ['cluster_conf', 'region_conf', 'az'])
 
 ## Constants
-default_security_group = 'TBD'
+default_security_group = 'Ignition'
 env = 'prod'
 sanity_check_job_name = 'HelloWorldSetup'
 sanity_check_job_timeout_minutes = 7
@@ -25,12 +25,12 @@ master_ami_type = 'pvm'
 job_timeout_minutes = 240
 
 regions_conf = collections.OrderedDict([
-    ('us-east-1', RegionConf('us-east-1', 'ami-5bb18832', 'ami-35b1885c', ['a', 'b', 'c', 'e'], 'vpc-TBD',
+    ('us-east-1', RegionConf('us-east-1', 'ami-5bb18832', 'ami-35b1885c', ['b', 'c', 'd', 'e'], 'vpc-d92a61bc',
         collections.OrderedDict([
-            ('us-east-1a', 'subnet-TBD'),
-            ('us-east-1b', 'subnet-TBD'),
-            ('us-east-1c', 'subnet-TBD'),
-            ('us-east-1e', 'subnet-TBD')])
+            ('us-east-1b', 'subnet-d3a511f8'),
+            ('us-east-1c', 'subnet-cbcca3bc'),
+            ('us-east-1d', 'subnet-120b8e4b'),
+            ('us-east-1e', 'subnet-fada92c0')])
         )
     ),
 #    ('us-west-2', RegionConf('us-west-2', 'ami-9a6e0daa', 'ami-ae6e0d9e', ['a', 'b', 'c'])),

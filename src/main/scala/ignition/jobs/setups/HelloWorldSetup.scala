@@ -15,9 +15,9 @@ object HelloWorldSetup extends ExecutionRetry {
     val now = runnerContext.config.date
 
     val count = executeRetrying {
-      val somedata = sc.filterAndGetTextFiles(
-        "s3n:///mr101ufcg/data/lastfm/similars",
-        requireSuccess = true, synchLocally = true, forceSynch = true)
+      val somedata = sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
+        lastN = Option(1), endDate = Option(now),
+        synchLocally = true, forceSynch = true)
 
       somedata.count
     }
