@@ -40,7 +40,11 @@ object SitemapXMLSetup extends ExecutionRetry {
     val config = runnerContext.config
     val now = runnerContext.config.date
 
-    val jobOutputBucket = s"s3n://bucket/tmp/${config.setupName}"
+    val productionUser = "root"
+    val jobOutputBucket = "bucket"
+    val finalBucket = "bucketlatest"
+    val finalBucketPrefix = "sitemaps"
+
 
     val clients = Set("saraiva-v5")
     // Config(baseHost: String, generatePages: Boolean, generateSearch: Boolean,
@@ -50,7 +54,7 @@ object SitemapXMLSetup extends ExecutionRetry {
                                  generatePages=true, generateSearch=false,
                                  detailsKeys=Set("ratings", "publisher", "brand", "ano", "produtoDigital"))))
 
-    val numberOutputs = 1
+    val numberOutputs = 10
 
     val willNeedSearch = configurations.values.exists(_.generateSearch)
     val parsedClickLogs = if (willNeedSearch) parseSearchClickLogs(sc.textFile("search/clicklog")).persist() else sc.emptyRDD[SearchClickLog]
@@ -60,8 +64,6 @@ object SitemapXMLSetup extends ExecutionRetry {
       val conf = configurations.getFor(apiKey)
       val pageUrls = if (conf.generatePages) {
       val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz", endDate = Option(now), lastN = Option(1)))
-//      val products = parseProducts(sc.textFile(s"/tmp/products/$apiKey"))
-//        val products = parseProducts(sc.textFile(s"/mnt/tmp/products/$apiKey"))
         SitemapXMLPagesJob.generateUrlXMLs(sc, now, products, conf)
       } else {
         sc.emptyRDD[String]
@@ -76,21 +78,25 @@ object SitemapXMLSetup extends ExecutionRetry {
       }
 
       val urls = pageUrls ++ searchUrls
-
-      val jobOutputPath = s"s3n://$jobOutputBucket/tmp/${config.setupName}/$apiKey/${config.tag}"
+      val jobOutputPart = s"tmp/${config.setupName}/$apiKey/${config.tag}"
+      val jobOutputPath = s"s3n://$jobOutputBucket/$jobOutputPart"
 
       val fullXMLsPerPartition = SitemapXMLJob.generateUrlSetPerPartition(urls.repartition(numberOutputs))
       fullXMLsPerPartition.saveAsTextFile(jobOutputPath, classOf[GzipCodec])
-//      fullXMLsPerPartition.saveAsTextFile(s"s3n://mail-ignition/tmp/sitexmls/${config.tag}/$apiKey", classOf[GzipCodec])
-//      fullXMLsPerPartition.saveAsTextFile(s"sitexmls/$apiKey", classOf[GzipCodec])
+      if (config.user == productionUser) {
+        copyAndGenerateSitemapIndex(conf, now, jobOutputBucket, jobOutputPart, finalBucket, s"$finalBucketPrefix/$apiKey", ".*part-.*")
+      }
     }
   }
 
   /*
     destBucket: APIKEY IS INSIDE.
    */
-  def copyAndGenerateSitemapIndex(conf: Config, now: DateTime, destBucket: String, destPath: String,
-                                  sourceBucket: String, sourceKey: String, glob: String = ".*part-.*"): Unit = {
+  def copyAndGenerateSitemapIndex(conf: Config, now: DateTime,
+                                  sourceBucket: String, sourceKey: String,
+                                  destBucket: String, destPath: String,
+                                  glob: String): Unit = {
+    val contentType = "application/xml"
     val s3 = new S3Client
     val srcFiles: List[String] = s3
       .list(sourceBucket, sourceKey)
@@ -102,13 +108,21 @@ object SitemapXMLSetup extends ExecutionRetry {
 
     srcFiles.foreach {
       filePath =>
-        executeRetrying(s3.copyFile(sourceBucket, filePath, destBucket, s"$destPath/${getFileName(filePath)}"))
+        val contentEncoding = if (filePath.endsWith(".gz"))
+          Option("gzip")
+        else
+          None
+        executeRetrying(s3.copyFile(sourceBucket,
+          filePath,
+          destBucket,
+          s"$destPath/${getFileName(filePath)}",
+          destContentType = Option(contentType), destContentEncoding = contentEncoding))
     }
 
     def sitemap(filename: String): Elem =
       <sitemap>
         <loc>{s"${conf.baseHost}/$filename"}</loc>
-        <lastmod>{ now.toIsoString }</lastmod>
+        <lastmod>{now.toIsoString}</lastmod>
       </sitemap>
 
     def generateSitemap(filenames: List[String]) =
@@ -118,6 +132,6 @@ object SitemapXMLSetup extends ExecutionRetry {
         |</sitemapindex>
         |""".stripMargin
 
-    executeRetrying(s3.writeContent(destBucket, s"$destPath/sitemap.xml", generateSitemap(srcFiles.map(getFileName))))
+    executeRetrying(s3.writeContent(destBucket, s"$destPath/sitemap.xml", generateSitemap(srcFiles.map(getFileName)), contentType = contentType))
   }
 }

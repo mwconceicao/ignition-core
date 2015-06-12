@@ -2,10 +2,11 @@ package ignition.jobs
 
 import ignition.chaordic.Chaordic
 import ignition.chaordic.pojo.Parsers.ProductV2Parser
+import ignition.core.testsupport.spark.SharedSparkContext
 import org.joda.time.DateTime
 import org.scalatest.{ShouldMatchers, FlatSpec}
 
-class SitemapJobSpec extends FlatSpec with ShouldMatchers {
+class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContext {
 
   val p =
     (new ProductV2Parser()).from("""
@@ -119,8 +120,35 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers {
                                    |
                                  """.stripMargin)
 
-  "Search" should "create link for product" in {
-    val links = SitemapXMLPagesJob.generateLink(p, "teste", List(Set("publisher")))
-    links shouldBe Seq.empty
+  val searchLogs = Seq(
+    """
+      |{"apiKey":"saraiva-v5","pageSize":45,"totalFound":5,"userId":"anon-cd7af330-66dd-11e4-b19e-61a4930b63fd","filters":{"rootCategory":["Música"]},"date":"2015-06-01T00:00:00.874836","query":"watchman","info":{"searchId":"2c6551ad-f292-4aea-9a40-2cb5a0aecc9b","resultsExpansion":false,"ip":"177.23.94.32","personalizeResults":false,"realUserId":null,"queryTime":61,"relatedQuery":null,"sesssion":"1433125746433-0.17949257581494749","chaordic_testGroup":{"code":null,"testCode":null,"experiment":null,"group":null,"session":null},"hasSynonyms":false,"browser_family":"Chrome","forceOriginal":false},"feature":"standard","page":1,"products":[{"info":{"purchase_weight":1.0375755736583676,"score":900011.06,"view_weight":0.88442279856244},"id":"2630839"},{"info":{"purchase_weight":0,"score":-1999999999.9,"view_weight":0},"id":"1320813"},{"info":{"purchase_weight":0,"score":-1999999999.9,"view_weight":0},"id":"1446738"},{"info":{"purchase_weight":0,"score":-1999999999.9,"view_weight":0},"id":"1229212"},{"info":{"purchase_weight":0,"score":-1999999999.9,"view_weight":0},"id":"798373"}],"order":"popularity"}
+    """.stripMargin,
+    """
+      |{"apiKey":"saraiva-v5","pageSize":48,"totalFound":0,"userId":"anon-34a6d2f4-080a-11e5-9fc8-024ce8a621bb","filters":null,"date":"2015-06-01T00:00:04.090027","query":"estante home","info":{"searchId":"66ecf418-b15a-4d8d-9a55-c759d1dd1ef8","resultsExpansion":true,"ip":"66.249.64.146","personalizeResults":false,"realUserId":null,"queryTime":17,"relatedQuery":null,"sesssion":null,"chaordic_testGroup":null,"hasSynonyms":false,"browser_family":"Googlebot","forceOriginal":false},"feature":"standard","page":1,"products":[{"info":{"purchase_weight":0,"score":3.043074,"view_weight":0},"id":"22578"},{"info":{"purchase_weight":0,"score":3.043074,"view_weight":0},"id":"68774"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.3353748,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.3978953,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":2.5505974,"view_weight":0},"id":"22578"},{"info":{"purchase_weight":0,"score":2.5505974,"view_weight":0},"id":"68774"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.1102133,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.5257285,"view_weight":0},"id":"127209"}],"order":null}
+    """.stripMargin
+  ).map(SearchLogParser.from)
+
+  val searchClicks = Seq(
+    """
+      |{"apiKey":"saraiva-v5","userId":null,"paginationInfo":{"pageIndex":0,"itemIndex":0,"pageItems":45},"anonymous":true,"date":"2015-06-01T00:00:00.231446","query":"watchman","info":{"requestExpansion":false,"searchId":"f2ec02a2-e820-41c7-84fa-da03611f5039","sesssion":null,"chaordic_testGroup":null,"url":"http://www.saraiva.com.br/o-jardim-secreto-336062.html","ip":"66.249.64.133","realUserId":null,"browser_family":"Googlebot"},"feature":"search","version":"V2","products":[{"sku":null,"price":34.0,"id":"336062"}],"type":"clicklog","page":"search","interactionType":"PRODUCT_DETAILS"}
+    """.stripMargin
+  ).map(SearchClickLogParser.from)
+
+  "Search" should "create link for product based on *categories" in {
+    val links = SitemapXMLPagesJob.generateLink(p, "baseHost", List(Set("publisher")))
+    links shouldBe List("baseHost/pages/produtos-digitais",
+      "baseHost/pages/produtos-digitais/livro-digital",
+      "baseHost/pages/produtos-digitais/livro-digital/literatura-estrangeira")
+  }
+
+  it should "create link for search logs" in {
+    val config = SitemapXMLJob.Config()
+    val result = SitemapXMLSearchJob.generateSearchURLXMLs(sc, DateTime.now,
+      sc.parallelize(searchLogs),
+      sc.parallelize(searchClicks), config).collect()
+
+    result(0).contains("<loc>/?q=watchman</loc>") shouldBe true
+    result(1).contains("<loc>/?q=estante+home</loc>") shouldBe true
   }
 }
