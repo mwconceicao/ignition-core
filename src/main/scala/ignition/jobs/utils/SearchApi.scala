@@ -32,6 +32,7 @@ object SearchApi {
 
     lazy val normalizedHost = removeTrailingSlash(host match {
       case host if host.startsWith("http://") || host.startsWith("https://") => host
+      case host if host.startsWith("//") => s"http:$host"
       case host => s"http://$host"
     })
   }
