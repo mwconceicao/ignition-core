@@ -3,6 +3,7 @@ package ignition.jobs
 import ignition.chaordic.Chaordic
 import ignition.chaordic.pojo.Parsers.ProductV2Parser
 import ignition.core.testsupport.spark.SharedSparkContext
+import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.joda.time.DateTime
 import org.scalatest.{ShouldMatchers, FlatSpec}
 
@@ -129,6 +130,8 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContex
     """.stripMargin
   ).map(SearchLogParser.from)
 
+  val config = SitemapConfig(host = "myhost", generatePages = true, generateSearch = true, details = Set("detailField1"), useDetails = true, maxSearchItems = 100, numberPartFiles = 3)
+
   val searchClicks = Seq(
     """
       |{"apiKey":"saraiva-v5","userId":null,"paginationInfo":{"pageIndex":0,"itemIndex":0,"pageItems":45},"anonymous":true,"date":"2015-06-01T00:00:00.231446","query":"watchman","info":{"requestExpansion":false,"searchId":"f2ec02a2-e820-41c7-84fa-da03611f5039","sesssion":null,"chaordic_testGroup":null,"url":"http://www.saraiva.com.br/o-jardim-secreto-336062.html","ip":"66.249.64.133","realUserId":null,"browser_family":"Googlebot"},"feature":"search","version":"V2","products":[{"sku":null,"price":34.0,"id":"336062"}],"type":"clicklog","page":"search","interactionType":"PRODUCT_DETAILS"}
@@ -136,19 +139,19 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContex
   ).map(SearchClickLogParser.from)
 
   "Search" should "create link for product based on *categories" in {
-    val links = SitemapXMLPagesJob.generateLink(p, "baseHost", List(Set("publisher")))
-    links shouldBe List("baseHost/pages/produtos-digitais",
-      "baseHost/pages/produtos-digitais/livro-digital",
-      "baseHost/pages/produtos-digitais/livro-digital/literatura-estrangeira")
+    // Note: ignoring details for now because its semantics will change soon
+    val links = SitemapXMLPagesJob.generateLink(config.copy(useDetails = false), p, List(Set("publisher")))
+    links shouldBe List("http://myhost/pages/produtos-digitais",
+      "http://myhost/pages/produtos-digitais/livro-digital",
+      "http://myhost/pages/produtos-digitais/livro-digital/literatura-estrangeira")
   }
 
   it should "create link for search logs" in {
-    val config = SitemapXMLJob.Config()
     val result = SitemapXMLSearchJob.generateSearchURLXMLs(sc, DateTime.now,
       sc.parallelize(searchLogs),
       sc.parallelize(searchClicks), config).collect()
 
-    result(0).contains("<loc>/?q=watchman</loc>") shouldBe true
-    result(1).contains("<loc>/?q=estante+home</loc>") shouldBe true
+    result(0).contains("<loc>http://myhost/?q=watchman</loc>") shouldBe true
+    result(1).contains("<loc>http://myhost/?q=estante+home</loc>") shouldBe true
   }
 }

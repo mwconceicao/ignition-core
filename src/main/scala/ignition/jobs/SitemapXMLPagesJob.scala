@@ -1,19 +1,16 @@
 package ignition.jobs
 
 import java.net.URLEncoder
-import java.net.URLEncoder
 
 import ignition.chaordic.JsonParser
 import ignition.chaordic.pojo.Product
 import ignition.chaordic.utils.Json
-import ignition.jobs.SitemapXMLJob._
-import org.apache.spark.SparkContext
-import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.rdd.RDD
-import org.apache.spark.SparkContext._
-import org.joda.time.DateTime
-
 import ignition.core.utils.DateUtils._
+import ignition.jobs.SitemapXMLJob._
+import ignition.jobs.utils.SearchApi.SitemapConfig
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+import org.joda.time.DateTime
 
 case class SearchProductInfo(purchase_weight: Double, score: Double, view_weight: Double)
 case class SearchProduct(info: SearchProductInfo, id: String)
@@ -43,8 +40,6 @@ object SearchClickLogParser extends JsonParser[SearchClickLog] {
 
 
 object SitemapXMLJob {
-  case class Config(baseHost: String = "", generatePages: Boolean = false, generateSearch: Boolean = false,
-                    detailsKeys: Set[String] = Set.empty)
 
   def encode(s: String): String = URLEncoder.encode(s, "UTF-8")
 
@@ -80,7 +75,7 @@ object SitemapXMLSearchJob {
                             now: DateTime,
                             searchLogs: RDD[SearchLog],
                             clickLogs: RDD[SearchClickLog],
-                            config: Config): RDD[String] = {
+                            config: SitemapConfig): RDD[String] = {
     val rankedQueries = searchLogs
       .filter(p => p.feature == "standard" && p.products.nonEmpty)
       .map(p => (p.query, 1))
@@ -95,12 +90,12 @@ object SitemapXMLSearchJob {
       rankedQueries.leftOuterJoin(rankedQueriesByClicks).map {
         case (query, (queryCount, optClickCount)) =>
           (query, optClickCount.getOrElse(0) * 1000 + queryCount)
-      }.top(5000)(Ordering.by(_._2))
+      }.top(config.maxSearchItems)(Ordering.by(_._2))
     }.keys
 
     val queryStrings = combinedQueriesWithRanks.map {
       query =>
-        val link = s"${config.baseHost}/?q=${encode(query)}"
+        val link = s"${config.normalizedHost}/?q=${encode(query)}"
         generateUrlXml(link, now, "hourly", 1.0)
     }
 
@@ -123,7 +118,7 @@ object SitemapXMLPagesJob {
       .toLowerCase                  // Lowercase the final results
   }
 
-  def generateDetailsKeySets(conf: Config): List[Set[String]] = conf.detailsKeys.subsets.toList
+  def generateDetailsKeySets(conf: SitemapConfig): List[Set[String]] = conf.details.subsets.toList
 
   def getDetails(product: Product, detailsKeySets: List[Set[String]]): List[Option[String]] =
     detailsKeySets.map {
@@ -139,12 +134,12 @@ object SitemapXMLPagesJob {
     }.distinct
 
 
-  def generateLink(p: Product, baseHost: String, detailsKeySets: List[Set[String]]): Seq[String] = {
-    val encodedDetails = List(Option.empty[String])//getDetails(p, detailsKeySets)
+  def generateLink(conf: SitemapConfig, p: Product, detailsKeySets: List[Set[String]]): Seq[String] = {
+    val encodedDetails = if (conf.useDetails) getDetails(p, detailsKeySets) else List(Option.empty[String])
 
     p.categoryPaths.toList.flatMap { categories =>
       (0 until categories.size).flatMap { i =>
-        val prefix = baseHost + "/pages/"
+        val prefix = conf.normalizedHost + "/pages/"
         val basePath = prefix + categories.take(i + 1)
           .flatMap(_.name)
           .map(slugify)
@@ -158,7 +153,7 @@ object SitemapXMLPagesJob {
     }
   }
 
-  def generateUrlXMLs(sc: SparkContext, _now: DateTime, products: RDD[Product], conf: Config): RDD[String] = {
+  def generateUrlXMLs(sc: SparkContext, _now: DateTime, products: RDD[Product], conf: SitemapConfig): RDD[String] = {
     val detailsKeySets = sc.broadcast(generateDetailsKeySets(conf))
     val now = sc.broadcast(_now)
     products
@@ -167,8 +162,8 @@ object SitemapXMLPagesJob {
         case _ => false
       })
       .flatMap { product =>
-        generateLink(product, conf.baseHost, detailsKeySets.value).map { link =>
-          generateUrlXml(link, now.value, "hourly", 1)
+        generateLink(conf, product, detailsKeySets.value).map { link =>
+          generateUrlXml(link, now.value, "daily", 1)
         }
       }.distinct()
   }

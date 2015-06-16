@@ -10,17 +10,22 @@ import ignition.core.jobs.ExecutionRetry
 import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.core.utils.DateUtils._
 import ignition.core.utils.S3Client
-import ignition.jobs.SitemapXMLJob.Config
 import ignition.jobs._
+import ignition.jobs.utils.SearchApi
+import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
+import org.slf4j.LoggerFactory
 
-import scala.util.Success
+import scala.util.{Failure, Try, Success}
 import scala.xml.Elem
 
 
 object SitemapXMLSetup extends ExecutionRetry {
+
+  private lazy val logger = LoggerFactory.getLogger("ignition.SitemapXMLSetup")
+
 
   def parseProducts(rdd: RDD[String]): RDD[Product] = rdd.map { line =>
     Chaordic.parseWith(line, new ProductV1Parser, new ProductV2Parser)
@@ -46,30 +51,41 @@ object SitemapXMLSetup extends ExecutionRetry {
     val finalBucketPrefix = "sitemaps"
 
 
-    val clients = Set("saraiva-v5")
-    // Config(baseHost: String, generatePages: Boolean, generateSearch: Boolean,
-    //pagesBaseHost: String = "", detailsKeys: Set[String] = Set.empty)
-    val configurations = new JobConfiguration(Config(),
-      Map("saraiva-v5" -> Config(baseHost="http://busca.saraiva.com.br",
-                                 generatePages=true, generateSearch=true,
-                                 detailsKeys=Set("ratings", "publisher", "brand", "ano", "produtoDigital"))))
+    logger.info("Getting clients list")
+    val allClients = executeRetrying(SearchApi.getClients())
+    logger.debug(s"Got clients: $allClients")
 
-    val numberOutputs = 10
+
+    val configurations = allClients.flatMap { client =>
+      logger.info(s"Getting sitemap configuration for $client")
+      val result = Try { executeRetrying(SearchApi.getSitemapConfig(client)) }
+      result match {
+        case Success(sitemapConfig) =>
+          logger.debug(s"Got configuration $sitemapConfig for $client")
+          client -> sitemapConfig :: Nil
+        case Failure(t) =>
+          logger.warn(s"Failed to get sitemap configuration for $client, message: ${t.getMessage}, ignoring client...")
+          Nil
+      }
+    }.toMap
 
     val willNeedSearch = configurations.values.exists(_.generateSearch)
+
+    logger.info(s"Do we need search logs? $willNeedSearch")
     val parsedClickLogs = if (willNeedSearch)
       parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
         endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist()
     else
       sc.emptyRDD[SearchClickLog]
+
     val parsedSearchLogs = if (willNeedSearch)
       parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
         endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist()
     else
       sc.emptyRDD[SearchLog]
 
-    clients.foreach { apiKey =>
-      val conf = configurations.getFor(apiKey)
+    configurations.foreach { case (apiKey, conf) =>
+      logger.info(s"Starting processing for client $apiKey")
       val pageUrls = if (conf.generatePages) {
       val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz",
         endDate = Option(now), lastN = Option(1)).repartition(500))
@@ -90,18 +106,20 @@ object SitemapXMLSetup extends ExecutionRetry {
       val jobOutputPart = s"tmp/${config.setupName}/$apiKey/${config.tag}"
       val jobOutputPath = s"s3n://$jobOutputBucket/$jobOutputPart"
 
-      val fullXMLsPerPartition = SitemapXMLJob.generateUrlSetPerPartition(urls.repartition(numberOutputs))
+      val fullXMLsPerPartition = SitemapXMLJob.generateUrlSetPerPartition(urls.repartition(conf.numberPartFiles))
       fullXMLsPerPartition.saveAsTextFile(jobOutputPath, classOf[GzipCodec])
       if (config.user == productionUser) {
-        copyAndGenerateSitemapIndex(conf, now, jobOutputBucket, jobOutputPart, finalBucket, s"$finalBucketPrefix/$apiKey", ".*part-.*")
+        copyAndGenerateSitemapIndex(now, jobOutputBucket, jobOutputPart, finalBucket, s"$finalBucketPrefix/$apiKey", ".*part-.*")
       }
     }
+
+    logger.info("Finished processing")
   }
 
   /*
     destBucket: APIKEY IS INSIDE.
    */
-  def copyAndGenerateSitemapIndex(conf: Config, now: DateTime,
+  def copyAndGenerateSitemapIndex(now: DateTime,
                                   sourceBucket: String, sourceKey: String,
                                   destBucket: String, destPath: String,
                                   glob: String): Unit = {
@@ -130,7 +148,7 @@ object SitemapXMLSetup extends ExecutionRetry {
 
     def sitemap(filename: String): Elem =
       <sitemap>
-        <loc>{s"${conf.baseHost}/$filename"}</loc>
+        <loc>{s"http://$destBucket.s3.amazonaws.com/$destPath/$filename"}</loc>
         <lastmod>{now.toIsoString}</lastmod>
       </sitemap>
 
