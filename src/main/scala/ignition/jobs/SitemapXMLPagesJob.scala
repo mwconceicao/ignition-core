@@ -71,7 +71,7 @@ object SitemapXMLJob {
 
 object SitemapXMLSearchJob {
 
-  def generateSearchURLXMLs(sc: SparkContext,
+  def generateSearchUrlXMLs(sc: SparkContext,
                             now: DateTime,
                             searchLogs: RDD[SearchLog],
                             clickLogs: RDD[SearchClickLog],
@@ -96,7 +96,7 @@ object SitemapXMLSearchJob {
     val queryStrings = combinedQueriesWithRanks.map {
       query =>
         val link = s"${config.normalizedHost}/?q=${encode(query)}"
-        generateUrlXml(link, now, "hourly", 1.0)
+        generateUrlXml(link, now, "daily", 1.0)
     }
 
     queryStrings

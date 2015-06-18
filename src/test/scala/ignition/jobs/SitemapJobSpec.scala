@@ -147,7 +147,7 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContex
   }
 
   it should "create link for search logs" in {
-    val result = SitemapXMLSearchJob.generateSearchURLXMLs(sc, DateTime.now,
+    val result = SitemapXMLSearchJob.generateSearchUrlXMLs(sc, DateTime.now,
       sc.parallelize(searchLogs),
       sc.parallelize(searchClicks), config).collect()
 

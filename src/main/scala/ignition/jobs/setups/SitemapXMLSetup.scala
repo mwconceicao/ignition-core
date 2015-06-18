@@ -15,9 +15,11 @@ import ignition.jobs.utils.SearchApi
 import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
+import scala.util.control.NonFatal
 import scala.util.{Failure, Try, Success}
 import scala.xml.Elem
 
@@ -74,46 +76,51 @@ object SitemapXMLSetup extends ExecutionRetry {
     logger.info(s"Do we need search logs? $willNeedSearch")
     val parsedClickLogs = if (willNeedSearch)
       parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
-        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist()
+        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist(StorageLevel.MEMORY_AND_DISK)
     else
       sc.emptyRDD[SearchClickLog]
 
     val parsedSearchLogs = if (willNeedSearch)
       parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
-        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist()
+        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist(StorageLevel.MEMORY_AND_DISK)
     else
       sc.emptyRDD[SearchLog]
 
+    logger.info(s"Will process clients ${configurations.keySet}")
     configurations.foreach { case (apiKey, conf) =>
-      logger.info(s"Starting processing for client $apiKey")
-      val pageUrls = if (conf.generatePages) {
-      val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz",
-        endDate = Option(now), lastN = Option(1)).repartition(500))
-        SitemapXMLPagesJob.generateUrlXMLs(sc, now, products, conf)
-      } else {
-        sc.emptyRDD[String]
-      }
+      try {
+        logger.info(s"Starting processing for client $apiKey")
+        val pageUrls = if (conf.generatePages) {
+          val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz",
+            endDate = Option(now), lastN = Option(1)).repartition(500))
+          SitemapXMLPagesJob.generateUrlXMLs(sc, now, products, conf)
+        } else {
+          sc.emptyRDD[String]
+        }
 
-      val searchUrls = if (conf.generateSearch) {
-        val searchClickLogs = parsedClickLogs.filter(_.apiKey == apiKey)
-        val searchLogs = parsedSearchLogs.filter(_.apiKey == apiKey)
-        SitemapXMLSearchJob.generateSearchURLXMLs(sc, now, searchLogs, searchClickLogs, conf)
-      } else{
-        sc.emptyRDD[String]
-      }
+        val searchUrls = if (conf.generateSearch) {
+          val searchClickLogs = parsedClickLogs.filter(_.apiKey == apiKey)
+          val searchLogs = parsedSearchLogs.filter(_.apiKey == apiKey)
+          SitemapXMLSearchJob.generateSearchUrlXMLs(sc, now, searchLogs, searchClickLogs, conf)
+        } else {
+          sc.emptyRDD[String]
+        }
 
-      val urls = pageUrls ++ searchUrls
-      val jobOutputPart = s"tmp/${config.setupName}/$apiKey/${config.tag}"
-      val jobOutputPath = s"s3n://$jobOutputBucket/$jobOutputPart"
+        val urls = pageUrls ++ searchUrls
+        val jobOutputPart = s"tmp/${config.setupName}/$apiKey/${config.tag}"
+        val jobOutputPath = s"s3n://$jobOutputBucket/$jobOutputPart"
 
-      val fullXMLsPerPartition = SitemapXMLJob.generateUrlSetPerPartition(urls.repartition(conf.numberPartFiles))
-      fullXMLsPerPartition.saveAsTextFile(jobOutputPath, classOf[GzipCodec])
-      if (config.user == productionUser) {
-        copyAndGenerateSitemapIndex(now, jobOutputBucket, jobOutputPart, finalBucket, s"$finalBucketPrefix/$apiKey", ".*part-.*")
+        val fullXMLsPerPartition = SitemapXMLJob.generateUrlSetPerPartition(urls.repartition(conf.numberPartFiles))
+        fullXMLsPerPartition.saveAsTextFile(jobOutputPath, classOf[GzipCodec])
+        if (config.user == productionUser) {
+          copyAndGenerateSitemapIndex(now, jobOutputBucket, jobOutputPart, finalBucket, s"$finalBucketPrefix/$apiKey", ".*part-.*")
+        }
+        logger.info(s"Finished processing $apiKey")
+      } catch {
+        case NonFatal(e) =>
+          logger.error(s"Got exception processing $apiKey, skipping client")
       }
     }
-
-    logger.info("Finished processing")
   }
 
   /*
