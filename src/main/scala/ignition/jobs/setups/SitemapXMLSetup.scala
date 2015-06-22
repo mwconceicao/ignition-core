@@ -113,7 +113,7 @@ object SitemapXMLSetup extends ExecutionRetry {
         val fullXMLsPerPartition = SitemapXMLJob.generateUrlSetPerPartition(urls.repartition(conf.numberPartFiles))
         fullXMLsPerPartition.saveAsTextFile(jobOutputPath, classOf[GzipCodec])
         if (config.user == productionUser) {
-          copyAndGenerateSitemapIndex(now, jobOutputBucket, jobOutputPart, finalBucket, s"$finalBucketPrefix/$apiKey", ".*part-.*")
+          copyAndGenerateSitemapIndex(now, conf, jobOutputBucket, jobOutputPart, finalBucket, s"$finalBucketPrefix/$apiKey", ".*part-.*")
         }
         logger.info(s"Finished processing $apiKey")
       } catch {
@@ -126,7 +126,7 @@ object SitemapXMLSetup extends ExecutionRetry {
   /*
     destBucket: APIKEY IS INSIDE.
    */
-  def copyAndGenerateSitemapIndex(now: DateTime,
+  def copyAndGenerateSitemapIndex(now: DateTime, conf: SitemapConfig,
                                   sourceBucket: String, sourceKey: String,
                                   destBucket: String, destPath: String,
                                   glob: String): Unit = {
@@ -155,7 +155,7 @@ object SitemapXMLSetup extends ExecutionRetry {
 
     def sitemap(filename: String): Elem =
       <sitemap>
-        <loc>{s"http://$destBucket.s3.amazonaws.com/$destPath/$filename"}</loc>
+        <loc>{s"${conf.normalizedHost}/sitemaps/$filename"}</loc>
         <lastmod>{now.toIsoString}</lastmod>
       </sitemap>
 
