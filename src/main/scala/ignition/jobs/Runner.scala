@@ -13,8 +13,8 @@ object Runner {
     ("WordCountSetup", (context => WordCountSetup.run(context), Map.empty)),
     // Main jobs
     ("SitemapXMLSetup", (context => SitemapXMLSetup.run(context), Map.empty)),
+    ("TransactionETLSetup", (context => TransactionETLSetup.run(context), Map.empty)),
     ("AnotherSetup", (context => WordCountSetup.run(context), Map.empty)) // FIXME
-
   )
 
 
