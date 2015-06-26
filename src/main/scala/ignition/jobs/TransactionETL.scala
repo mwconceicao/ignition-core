@@ -6,9 +6,6 @@ import ignition.jobs.AggregationLevel.AggregationValue
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import org.json4s._
-import org.json4s.native.Serialization
-import org.json4s.native.Serialization.write
 
 
 object AggregationLevel {
