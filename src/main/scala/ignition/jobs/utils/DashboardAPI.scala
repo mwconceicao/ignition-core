@@ -22,7 +22,7 @@ object DashboardAPI {
 
   //search/kpi_test
   def dailyFact(product: String, kpi: String, resultPoint: ResultPoint) = {
-
+    // TODO: need to change key to day or create a case class for sending it
     dashboardPipeline(Post(s"$baseHref/$product/$kpi", resultPoint))
   }
 
