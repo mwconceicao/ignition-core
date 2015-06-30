@@ -6,7 +6,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 
-case class ResultPoint(key: String, value: Double)
+case class ResultPoint(key: String, apikey: String, value: Double)
 case class ETLResult(searchRevenue: RDD[ResultPoint], participationRatio: RDD[ResultPoint])
 
 object TransactionETL {
@@ -50,7 +50,7 @@ object TransactionETL {
     }
 
   def process(sc: SparkContext,
-              transactions: RDD[Transaction]): ETLResult = {
+              transactions: RDD[Transaction], apiKey: String): ETLResult = {
 
     val searchTransactions = calculateSearchTransactions(transactions)
 
@@ -61,8 +61,8 @@ object TransactionETL {
 
     val participation: RDD[MetricByDate] = calculateParticipation(joinedTransactions)
 
-    ETLResult(searchTransactions.map { p => ResultPoint(p._1, p._2) },
-              participation.map { p => ResultPoint(p._1, p._2) })
+    ETLResult(searchTransactions.map { p => ResultPoint(p._1, apiKey, p._2) },
+              participation.map { p => ResultPoint(p._1, apiKey, p._2) })
 
   }
 
