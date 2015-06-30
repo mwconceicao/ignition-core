@@ -4,6 +4,7 @@ import ignition.chaordic.Chaordic
 import ignition.chaordic.pojo.Parsers.TransactionParser
 import ignition.chaordic.pojo.Transaction
 import ignition.chaordic.utils.ChaordicPathDateExtractor._
+import ignition.chaordic.utils.Json
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.jobs.TransactionETL
@@ -11,10 +12,12 @@ import ignition.jobs.setups.SitemapXMLSetup._
 import ignition.jobs.utils.SearchApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.joda.time.DateTime
 import org.json4s.native.Serialization.write
 import org.slf4j.LoggerFactory
 
-import scala.util.Success
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 object TransactionETLSetup {
 
@@ -23,56 +26,51 @@ object TransactionETLSetup {
   def run(runnerContext: RunnerContext) {
 
     val sc = runnerContext.sparkContext
-    val config = runnerContext.config
-    val now = runnerContext.config.date
+    val now: DateTime = runnerContext.config.date
 
-    val productionUser = "root"
+    val productionUser = runnerContext.config.user
+    val config = runnerContext.config
     val jobOutputBucket = "chaordic-search-ignition-history"
-    val finalBucket = "chaordic-search-ignition-latest"
+    val jobPath = s"$jobOutputBucket/${config.setupName}/$productionUser"
 
     logger.info("Getting clients list")
     val allClients: Set[String] = executeRetrying(SearchApi.getClients())
-//    val allClients = Set("saraiva-v5")
-    logger.debug(s"Got clients: $allClients")
+    logger.info(s"Got clients: $allClients")
 
+    allClients
+      .map(client => getTransactions(runnerContext, client))
+      .collect { case Success((client, transactions)) => (client, transactions)}
+      .foreach {
+        case (client, transactions) =>
+          logger.info(s"Starting ETLTransaction for client $client")
+          val results = TransactionETL.process(sc, transactions)
 
+          logger.info(s"Saving search transactions for client $client")
+          results.searchRevenue.map(Json.toJsonString(_))
+            .saveAsTextFile(s"s3://$jobPath/searchRevenue/${config.tag}/$client")
 
-    allClients.foreach {
-      client => {
+          logger.info(s"Saving search participations for client $client")
+          results.participationRatio.map(Json.toJsonString(_))
+            .saveAsTextFile(s"s3://$jobPath/participationRatio/${config.tag}/$client")
 
-        logger.info(s"Starting ETLTransaction for client $client")
-
-        val transactions: RDD[Transaction] =
-          sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/buyOrders/*/$client",
-            endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay())).map {
-              rawTransaction => Chaordic.parseWith(rawTransaction, new TransactionParser)
-          }.collect{ case Success(t) => t }.persist(StorageLevel.MEMORY_AND_DISK)
-
-        logger.info(s"Parsed all transactions for client $client")
-
-        val results = TransactionETL.process(sc, transactions)
-
-        results.searchRevenue.map {
-          x =>
-            implicit val formats = org.json4s.DefaultFormats
-            write(x)
-        }.saveAsTextFile("/tmp/test/searchRevenue")
-
-        logger.info(s"Saving search transactions for client $client")
-        //fullXMLsPerPartition.saveAsTextFile(jobOutputPath, classOf[GzipCodec])
-
-        results.participationRatio.map {
-          x =>
-            implicit val formats = org.json4s.DefaultFormats
-            write(x)
-        }.saveAsTextFile("/tmp/test/participationRatio")
-
-        logger.info(s"Saving search participations for client $client")
-      }
+          logger.info(s"ETLTransaction finished for client $client")
     }
 
+    logger.info("TransactionETL - GREAT SUCCESS")
+  }
 
-
-
+  def getTransactions(rc: RunnerContext, client: String): Try[(String, RDD[Transaction])] = {
+    val now = rc.config.date
+    Try {
+      client -> rc.sparkContext.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/buyOrders/2015-06*/$client.gz",
+        endDate = Option(now), startDate = Option(now.minusDays(1).withTimeAtStartOfDay())).map {
+        rawTransaction => Chaordic.parseWith(rawTransaction, new TransactionParser)
+      }.collect { case Success(t) => t }.persist(StorageLevel.MEMORY_AND_DISK)
+    } recoverWith {
+      case NonFatal(exception) =>
+        logger.error(s"Could not parse BuyOrders for client $client", exception)
+        Failure(exception)
+    }
   }
 }
+

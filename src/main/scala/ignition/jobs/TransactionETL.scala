@@ -12,6 +12,7 @@ case class ETLResult(searchRevenue: RDD[ResultPoint], participationRatio: RDD[Re
 object TransactionETL {
 
   type MetricByDate = (String, Double)
+  val aggregationLevel = "yyyy-MM-dd"
 
   implicit class ETLTransaction(transaction: Transaction) {
     def cashFromTransaction: Double = {
@@ -22,8 +23,6 @@ object TransactionETL {
       } yield quantity * price
       itemPrices.sum
     }
-
-    val aggregationLevel = "yyyy-MM-dd"
 
     def aggregationKey = transaction.date.toString(aggregationLevel)
 
