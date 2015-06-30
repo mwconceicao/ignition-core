@@ -13,7 +13,6 @@ import ignition.jobs.utils.SearchApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.joda.time.DateTime
-import org.json4s.native.Serialization.write
 import org.slf4j.LoggerFactory
 
 import scala.util.control.NonFatal
@@ -43,7 +42,7 @@ object TransactionETLSetup {
       .foreach {
         case (client, transactions) =>
           logger.info(s"Starting ETLTransaction for client $client")
-          val results = TransactionETL.process(sc, transactions)
+          val results = TransactionETL.process(sc, transactions, client)
 
           logger.info(s"Saving search transactions for client $client")
           results.searchRevenue.map(Json.toJsonString(_))
