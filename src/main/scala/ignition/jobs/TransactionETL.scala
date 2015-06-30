@@ -4,10 +4,16 @@ package ignition.jobs
 import ignition.chaordic.pojo.Transaction
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import spray.json.DefaultJsonProtocol
 
 
 case class ResultPoint(key: String, apikey: String, value: Double)
 case class ETLResult(searchRevenue: RDD[ResultPoint], participationRatio: RDD[ResultPoint])
+
+object TransactionETLProtocol extends DefaultJsonProtocol {
+  implicit val resultPointFormat = jsonFormat3(ResultPoint)
+}
+
 
 object TransactionETL {
 
