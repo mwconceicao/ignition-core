@@ -36,7 +36,7 @@ object SearchApi {
       case host => s"http://$host"
     })
   }
-  
+
   def getSitemapConfig(apiKey: String): SitemapConfig = {
     getApiJson(s"/confs/sitemap/${encode(apiKey)}/").extract[SitemapConfig]
   }

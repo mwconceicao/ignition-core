@@ -36,7 +36,6 @@ case class ETLTransaction(transaction: Transaction) {
     transaction.date.toString(aggregationPattern.pattern)
   }
 
-
   def isSearchTransaction = transaction.info.contains("cssearch")
 }
 
