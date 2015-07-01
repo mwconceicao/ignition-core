@@ -1,8 +1,8 @@
 package ignition.jobs.setups
 
 import ignition.chaordic.Chaordic
-import ignition.chaordic.pojo.Parsers.{ProductV1Parser, ProductV2Parser}
-import ignition.chaordic.pojo.Product
+import ignition.chaordic.pojo.Parsers.{ProductV1Parser, ProductV2Parser, SearchClickLogParser, SearchLogParser}
+import ignition.chaordic.pojo.{Product, SearchClickLog, SearchLog}
 import ignition.chaordic.utils.ChaordicPathDateExtractor._
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.core.jobs.ExecutionRetry
@@ -21,7 +21,7 @@ import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
 import scala.util.control.NonFatal
-import scala.util.{Failure, Try, Success}
+import scala.util.{Failure, Success, Try}
 import scala.xml.Elem
 
 

@@ -3,15 +3,15 @@ package ignition.jobs
 import java.net.URLEncoder
 
 import ignition.chaordic.JsonParser
-import ignition.chaordic.pojo.Product
+import ignition.chaordic.pojo.{SearchClickLog, SearchLog, Product}
 import ignition.chaordic.utils.Json
 import ignition.core.utils.DateUtils._
 import ignition.jobs.SitemapXMLJob._
-import ignition.jobs.pojo.{SearchClickLog, SearchLog}
 import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
+
 
 object SitemapXMLJob {
 
