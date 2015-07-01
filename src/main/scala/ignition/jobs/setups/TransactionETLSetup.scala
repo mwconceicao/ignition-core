@@ -18,6 +18,15 @@ import org.slf4j.LoggerFactory
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
+/**
+ * This Job Calculate our Transaction based metrics.
+ *
+ * It consist of two basic metrics:
+ *  - searchSales: Monetary value of all the transactions that search was involved (done by checking the
+ *                 `cssearch` field on info, that tagged by Onsite).
+ *  - searchParticipationRatio: This correspond to ratio between sales that search was involved and all sales.
+ */
+
 object TransactionETLSetup {
 
   private lazy val logger = LoggerFactory.getLogger("ignition.TransactionETLSetup")
