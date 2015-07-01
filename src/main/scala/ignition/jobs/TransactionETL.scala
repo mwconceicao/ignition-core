@@ -7,7 +7,7 @@ import org.apache.spark.rdd.RDD
 import spray.json.DefaultJsonProtocol
 
 
-case class ResultPoint(key: String, apikey: String, value: Double)
+case class ResultPoint(day: String, client: String, value: Double)
 case class ETLResult(searchRevenue: RDD[ResultPoint], participationRatio: RDD[ResultPoint])
 
 object TransactionETLProtocol extends DefaultJsonProtocol {
@@ -37,17 +37,33 @@ object TransactionETL {
     def isSearchTransaction = transaction.info.contains("cssearch")
   }
 
+  /**
+   * Calculate the monetary value given bt all transactions that search was involved aggregated by day.
+   * @param transactions All transactions of a client.
+   * @return RDD of (date, cash)
+   */
   def calculateSearchTransactions(transactions: RDD[Transaction]): RDD[MetricByDate] =
     transactions
       .filter(_.isSearchTransaction)
       .map(_.cashByDay)
       .reduceByKey(_ + _)
 
+  /**
+   * Calculate the monetary value given bt all transactions that search was *NOT* involved aggregated by day.
+   * @param transactions All transactions of a client.
+   * @return RDD of (date, cash)
+   */
   def calculateNonSearchTransactions(transactions: RDD[Transaction]): RDD[MetricByDate] =
     transactions
       .filter(!_.isSearchTransaction)
       .map(_.cashByDay)
       .reduceByKey(_ + _)
+
+  /**
+   * Given a joint RDD of Search and Non Search values calculate searchValue / (searchValue + nonSearchValue)
+   * @param joinedTransactions (date, searchCash, nonSearchCash)
+   * @return The participation Ratio
+   */
 
   def calculateParticipation(joinedTransactions: RDD[(String, (Double, Double))]) =
     joinedTransactions.map {
