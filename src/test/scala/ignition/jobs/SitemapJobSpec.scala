@@ -1,12 +1,11 @@
 package ignition.jobs
 
-import ignition.chaordic.Chaordic
-import ignition.chaordic.pojo.Parsers.ProductV2Parser
+import ignition.chaordic.pojo.Parsers.{SearchClickLogParser, ProductV2Parser, SearchLogParser}
 import ignition.core.testsupport.spark.SharedSparkContext
 import ignition.jobs.pojo.Parsers.{SearchClickLogParser, SearchLogParser}
 import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.joda.time.DateTime
-import org.scalatest.{ShouldMatchers, FlatSpec}
+import org.scalatest.{FlatSpec, ShouldMatchers}
 
 class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContext {
 
