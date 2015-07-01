@@ -1,6 +1,7 @@
 package ignition.jobs
 
 import ignition.chaordic.pojo.ChaordicGenerators
+import ignition.chaordic.pojo.ChaordicGenerators.TimeUnits
 import ignition.core.testsupport.spark.SharedSparkContext
 import ignition.core.utils.BetterTrace
 import ignition.jobs.TransactionETL.ETLTransaction
