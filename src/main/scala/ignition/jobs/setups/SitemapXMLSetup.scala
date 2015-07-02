@@ -4,13 +4,14 @@ import ignition.chaordic.Chaordic
 import ignition.chaordic.pojo.Parsers.{ProductV1Parser, ProductV2Parser}
 import ignition.chaordic.pojo.Product
 import ignition.chaordic.utils.ChaordicPathDateExtractor._
-import ignition.chaordic.utils.JobConfiguration
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.core.jobs.ExecutionRetry
 import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.core.utils.DateUtils._
 import ignition.core.utils.S3Client
 import ignition.jobs._
+import ignition.jobs.pojo.Parsers.{SearchLogParser, SearchClickLogParser}
+import ignition.jobs.pojo.{SearchClickLog, SearchLog}
 import ignition.jobs.utils.SearchApi
 import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.apache.hadoop.io.compress.GzipCodec
@@ -34,11 +35,11 @@ object SitemapXMLSetup extends ExecutionRetry {
   }.collect { case Success(v) => v.fold(identity, identity) }
 
   def parseSearchLogs(rdd: RDD[String]): RDD[SearchLog] = rdd.map { line =>
-    Chaordic.parseWith(line, SearchLogParser)
+    Chaordic.parseWith(line, new SearchLogParser)
   }.collect { case Success(v) => v }
 
   def parseSearchClickLogs(rdd: RDD[String]): RDD[SearchClickLog] = rdd.map { line =>
-    Chaordic.parseWith(line, SearchClickLogParser)
+    Chaordic.parseWith(line, new SearchClickLogParser)
   }.collect { case Success(v) => v }
 
   def run(runnerContext: RunnerContext) {
