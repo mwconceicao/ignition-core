@@ -1,22 +1,26 @@
 package ignition.jobs.setups
 
-import ignition.chaordic.Chaordic
+import java.util.concurrent.{Executors, TimeUnit}
+
 import ignition.chaordic.pojo.Parsers.TransactionParser
 import ignition.chaordic.pojo.Transaction
 import ignition.chaordic.utils.ChaordicPathDateExtractor._
-import ignition.chaordic.utils.Json
+import ignition.chaordic.{Chaordic, ParsingReporter}
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.core.jobs.utils.SparkContextUtils._
-import ignition.jobs.TransactionETL
 import ignition.jobs.setups.SitemapXMLSetup._
-import ignition.jobs.utils.SearchApi
+import ignition.jobs.utils.{DashboardAPI, SearchApi}
+import ignition.jobs.{ResultPoint, TransactionETL}
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import org.joda.time.DateTime
+import org.joda.time.{DateTime, Interval}
 import org.slf4j.LoggerFactory
 
+import scala.concurrent._
+import scala.concurrent.duration.Duration
+import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
 
 /**
  * This Job Calculate our Transaction based metrics.
@@ -31,54 +35,68 @@ object TransactionETLSetup {
 
   private lazy val logger = LoggerFactory.getLogger("ignition.TransactionETLSetup")
 
+  implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
+
   def run(runnerContext: RunnerContext) {
-
     val sc = runnerContext.sparkContext
-    val now: DateTime = runnerContext.config.date
-
-    val productionUser = runnerContext.config.user
     val config = runnerContext.config
-    val jobOutputBucket = "chaordic-search-ignition-history"
-    val jobPath = s"$jobOutputBucket/${config.setupName}/$productionUser"
 
-    logger.info("Getting clients list")
-    val allClients: Set[String] = executeRetrying(SearchApi.getClients())
-    logger.info(s"Got clients: $allClients")
+    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(1).withTimeAtStartOfDay())
+    val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.withTime(23, 59, 59, 999))
 
-    allClients
-      .map(client => getTransactions(runnerContext, client))
-      .collect { case Success((client, transactions)) => (client, transactions)}
-      .foreach {
-        case (client, transactions) =>
-          logger.info(s"Starting ETLTransaction for client $client")
-          val results = TransactionETL.process(sc, transactions, client)
+    val timeoutSaveOperation = Duration(30, TimeUnit.MINUTES)
 
-          logger.info(s"Saving search transactions for client $client")
-          results.searchRevenue.map(Json.toJsonString(_))
-            .saveAsTextFile(s"s3://$jobPath/searchRevenue/${config.tag}/$client")
+    logger.info(s"Starting TransactionETLSetup for start=$start, end=$end")
 
-          logger.info(s"Saving search participations for client $client")
-          results.participationRatio.map(Json.toJsonString(_))
-            .saveAsTextFile(s"s3://$jobPath/participationRatio/${config.tag}/$client")
+    val allClients = executeRetrying(SearchApi.getClients())
+    logger.info(s"With clients: $allClients")
 
-          logger.info(s"ETLTransaction finished for client $client")
+    val transactions = parseTransactions(sc, start, end, allClients).persist(StorageLevel.MEMORY_AND_DISK)
+
+    logger.info(s"Starting ETLTransaction")
+    val results = TransactionETL.process(sc, transactions)
+
+    val saveSalesSearch = saveMetrics("sales_search", start, end, results.salesSearch.collect().toSeq)
+    val saveSalesOverall = saveMetrics("sales_overall", start, end, results.salesOverall.collect().toSeq)
+    val saveToDashBoard = saveSalesSearch.zip(saveSalesOverall)
+
+    saveToDashBoard.onComplete {
+      case Success(_) => logger.info("TransactionETL - GREAT SUCCESS")
+      case Failure(exception) => logger.error("Error on saving metrics to dashboard API", exception)
     }
 
-    logger.info("TransactionETL - GREAT SUCCESS")
-  }
-
-  def getTransactions(rc: RunnerContext, client: String): Try[(String, RDD[Transaction])] = {
-    val now = rc.config.date
-    Try {
-      client -> rc.sparkContext.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/buyOrders/2015-06*/$client.gz",
-        endDate = Option(now), startDate = Option(now.minusDays(1).withTimeAtStartOfDay())).map {
-        rawTransaction => Chaordic.parseWith(rawTransaction, new TransactionParser)
-      }.collect { case Success(t) => t }.persist(StorageLevel.MEMORY_AND_DISK)
-    } recoverWith {
+    try {
+      Await.ready(saveToDashBoard, timeoutSaveOperation)
+    } catch {
       case NonFatal(exception) =>
-        logger.error(s"Could not parse BuyOrders for client $client", exception)
-        Failure(exception)
+        logger.error("Error on saving metrics to dashboard API", exception)
     }
   }
-}
 
+  def saveMetrics(kpi: String, start: DateTime, end: DateTime, points: Seq[ResultPoint]): Future[Unit] = {
+    DashboardAPI.deleteDailyFact("search", kpi, new Interval(start, end)).flatMap { response =>
+      logger.info(s"Cleanup for kpi = $kpi, start = $start, end = $end")
+      Future.sequence(points.map(point => DashboardAPI.dailyFact("search", kpi, point))).map { _ =>
+        logger.info(s"Kpi $kpi saved")
+      }
+    }
+  }
+
+  def parseTransactions(context: SparkContext, start: DateTime, end: DateTime, clients: Set[String]): RDD[Transaction] =
+    context.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/buyOrders/*/{${clients.mkString(",")}}.gz",
+      endDate = Option(end), startDate = Option(start)).map {
+      json => Chaordic.parseWith(json, parser = new TransactionParser, reporter = reporterFor("transaction"))
+    }.collect { case Success(parsed) => parsed }
+
+  def parseDateOrElse(param: Option[String], default: DateTime) = param.map(DateTime.parse).getOrElse(default)
+
+  def reporterFor(entityName: String) = new ParsingReporter {
+    override def reportError(message: String, jsonStr: String): Unit =
+      logger.trace("Failed to parse '{}' with error '{}' for entity {}", jsonStr, message, entityName)
+
+    override def reportSuccess(jsonStr: String): Unit =
+      // using Seq to solve scala ambiguous reference to overloaded definition
+      logger.trace("Parsed successfully json '{}' to entity {}", Seq(jsonStr, entityName))
+  }
+
+}

@@ -2,13 +2,14 @@ package ignition.jobs
 
 import ignition.chaordic.pojo.ChaordicGenerators
 import ignition.chaordic.pojo.ChaordicGenerators.TimeUnits
+import ignition.chaordic.utils.Json
 import ignition.core.testsupport.spark.SharedSparkContext
 import ignition.core.utils.BetterTrace
 import ignition.jobs.TransactionETL.ETLTransaction
-import org.apache.spark.rdd.RDD
 import org.scalacheck.Gen
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FlatSpec, ShouldMatchers}
+import scala.language.postfixOps
 
 class TransactionETLTest extends FlatSpec with ShouldMatchers with SharedSparkContext
   with GeneratorDrivenPropertyChecks with BetterTrace {
@@ -19,8 +20,11 @@ class TransactionETLTest extends FlatSpec with ShouldMatchers with SharedSparkCo
     ChaordicGenerators.transactionGenerator(gInfo = Gen.const(Map("cssearch" -> "")))
   ).map(sc.parallelize(_))
 
-  "ETLTransaction" should "calculate how much money it have" in {
+  implicit class DoubleComparison(target: Double) {
+    def ~=(another: Double, precision: Double = 0.001) = (target - another).abs < precision
+  }
 
+  "ETLTransaction" should "calculate how much money it have" in {
     forAll(transactionGenerator) {
       transaction => {
         val cash = {
@@ -31,78 +35,54 @@ class TransactionETLTest extends FlatSpec with ShouldMatchers with SharedSparkCo
           } yield quantity * price
         }.sum
 
-        transaction.cashFromTransaction should be (cash)
+        (transaction.cashFromTransaction ~= cash) shouldBe true
       }
     }
-
   }
 
-  it should "sum search transactions on method calculateSearchTransactions on the same day" in {
+  it should "sum search transactions on method calculateSearchSales" in {
     forAll(searchTransactionsGenerator) {
       transactions =>
-        val sumOfRDD: Double = TransactionETL.calculateSearchTransactions(transactions).map(_._2).sum()
+        val sumOfRDD = TransactionETL.calculateSearchSales(transactions).map(_._2).sum()
+        val sumOfRaw = transactions.map(_.cashFromTransaction).sum()
 
-        sumOfRDD should be (transactions.map(_.cashFromTransaction).sum)
+        (sumOfRDD ~= sumOfRaw) shouldBe true
     }
   }
 
   it should "not sum search transactions on method calculateSearchTransactions on the same day" in {
     forAll(nonSearchTransactionsGenerator) {
       transactions =>
-        val sumOfRDD = TransactionETL.calculateSearchTransactions(transactions)
+        val sumOfRDD = TransactionETL.calculateSearchSales(transactions)
 
-        sumOfRDD.isEmpty() should be (true)
+        sumOfRDD.isEmpty() shouldBe true
     }
   }
 
-  it should "generate the same number of keys as we have days in our RDD" in {
-    val timedTransactions = Gen.nonEmptyListOf(
+  it should "generate the same number of keys as we have client/days in our RDD" in {
+    val transactions = Gen.nonEmptyListOf(
       ChaordicGenerators.transactionGenerator(
         gDate = ChaordicGenerators.dateGenerator(TimeUnits.DAYS),
         gInfo = Gen.const(Map("cssearch" -> ""))
       )
     ).map(sc.parallelize(_))
 
-    forAll(timedTransactions) {
+    forAll(transactions) {
       transactions =>
-        val numberOfDays: Long = TransactionETL.calculateSearchTransactions(transactions).keys.count()
+        val actualAmountOfMetrics = TransactionETL.calculateSearchSales(transactions).keys.count()
+        val expectedAmountOfMetrics = transactions.map(_.cashByDay).keys.distinct().count()
 
-        numberOfDays should be (transactions.map(_.aggregationKey).distinct().count())
+        actualAmountOfMetrics shouldBe expectedAmountOfMetrics
     }
-
   }
 
   it should "sum search transactions on method calculateNonSearchTransactions on the same day" in {
-    forAll(nonSearchTransactionsGenerator) {
-      transactions =>
-        val sumOfRDD: Double = TransactionETL.calculateNonSearchTransactions(transactions).map(_._2).sum()
-
-        sumOfRDD should be (transactions.map(_.cashFromTransaction).sum)
-    }
-  }
-
-  it should "not sum search transactions on method calculateNonSearchTransactions on the same day" in {
     forAll(searchTransactionsGenerator) {
       transactions =>
-        val sumOfRDD = TransactionETL.calculateNonSearchTransactions(transactions)
+        val sumOfRDD = TransactionETL.calculateOverallSales(transactions).map(_._2).sum()
+        val sumOfRaw = transactions.map(_.cashFromTransaction).sum()
 
-        sumOfRDD.isEmpty() should be (true)
-    }
-  }
-
-  it should "calculate the participation" in {
-    forAll(nonSearchTransactionsGenerator, searchTransactionsGenerator) {
-      (nonSearchTransactions, searchTransactions) =>
-
-        val joinedTransactions: RDD[(String, (Double, Double))] =
-          TransactionETL.calculateSearchTransactions(searchTransactions)
-            .join(TransactionETL.calculateNonSearchTransactions(nonSearchTransactions))
-
-        TransactionETL.calculateParticipation(joinedTransactions).collect() should be (joinedTransactions.map {
-          case (key: String, (searchValue: Double, nonSearchValue: Double)) =>
-            (key, searchValue / (searchValue + nonSearchValue))
-        }.collect())
-
+        (sumOfRDD ~= sumOfRaw) shouldBe true
     }
   }
 

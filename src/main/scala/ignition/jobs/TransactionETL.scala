@@ -2,22 +2,21 @@ package ignition.jobs
 
 
 import ignition.chaordic.pojo.Transaction
+import ignition.jobs.TransactionETL.MetricByDate
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import spray.json.DefaultJsonProtocol
 
-
-case class ResultPoint(day: String, client: String, value: Double)
-case class ETLResult(searchRevenue: RDD[ResultPoint], participationRatio: RDD[ResultPoint])
+case class ResultPoint(client: String, day: String, value: Double)
+case class ETLResult(salesSearch: RDD[ResultPoint], salesOverall: RDD[ResultPoint])
 
 object TransactionETLProtocol extends DefaultJsonProtocol {
   implicit val resultPointFormat = jsonFormat3(ResultPoint)
 }
 
-
 object TransactionETL {
 
-  type MetricByDate = (String, Double)
+  type MetricByDate = ((String, String), Double)
   val aggregationLevel = "yyyy-MM-dd"
 
   implicit class ETLTransaction(transaction: Transaction) {
@@ -32,7 +31,7 @@ object TransactionETL {
 
     def aggregationKey = transaction.date.toString(aggregationLevel)
 
-    def cashByDay = (aggregationKey, cashFromTransaction)
+    def cashByDay: MetricByDate = ((transaction.apiKey, aggregationKey), cashFromTransaction)
 
     def isSearchTransaction = transaction.info.contains("cssearch")
   }
@@ -42,50 +41,31 @@ object TransactionETL {
    * @param transactions All transactions of a client.
    * @return RDD of (date, cash)
    */
-  def calculateSearchTransactions(transactions: RDD[Transaction]): RDD[MetricByDate] =
+  def calculateSearchSales(transactions: RDD[Transaction]): RDD[MetricByDate] =
     transactions
       .filter(_.isSearchTransaction)
       .map(_.cashByDay)
       .reduceByKey(_ + _)
 
   /**
-   * Calculate the monetary value given bt all transactions that search was *NOT* involved aggregated by day.
+   * Calculate the monetary value given bt all transactions aggregated by day.
    * @param transactions All transactions of a client.
    * @return RDD of (date, cash)
    */
-  def calculateNonSearchTransactions(transactions: RDD[Transaction]): RDD[MetricByDate] =
+  def calculateOverallSales(transactions: RDD[Transaction]): RDD[MetricByDate] =
     transactions
-      .filter(!_.isSearchTransaction)
       .map(_.cashByDay)
       .reduceByKey(_ + _)
 
-  /**
-   * Given a joint RDD of Search and Non Search values calculate searchValue / (searchValue + nonSearchValue)
-   * @param joinedTransactions (date, searchCash, nonSearchCash)
-   * @return The participation Ratio
-   */
-
-  def calculateParticipation(joinedTransactions: RDD[(String, (Double, Double))]) =
-    joinedTransactions.map {
-      case (key: String, (searchValue: Double, nonSearchValue: Double)) =>
-        (key, searchValue / (searchValue + nonSearchValue))
+  def process(sc: SparkContext, transactions: RDD[Transaction]): ETLResult = {
+    val salesSearch = calculateSearchSales(transactions).map {
+      case ((client: String, day: String), value: Double) => ResultPoint(client, day, value)
+    }
+    val salesOverall = calculateOverallSales(transactions).map {
+      case ((client: String, day: String), value: Double) => ResultPoint(client, day, value)
     }
 
-  def process(sc: SparkContext,
-              transactions: RDD[Transaction], apiKey: String): ETLResult = {
-
-    val searchTransactions = calculateSearchTransactions(transactions)
-
-    val nonSearchTransactions: RDD[MetricByDate] = calculateNonSearchTransactions(transactions)
-
-    val joinedTransactions: RDD[(String, (Double, Double))] =
-      searchTransactions.join(nonSearchTransactions)
-
-    val participation: RDD[MetricByDate] = calculateParticipation(joinedTransactions)
-
-    ETLResult(searchTransactions.map { p => ResultPoint(p._1, apiKey, p._2) },
-              participation.map { p => ResultPoint(p._1, apiKey, p._2) })
-
+    ETLResult(salesSearch, salesOverall)
   }
 
 }

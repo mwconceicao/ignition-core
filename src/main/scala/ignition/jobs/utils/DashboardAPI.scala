@@ -18,12 +18,11 @@ object DashboardAPI {
   implicit val system = ActorSystem("dashboard-api")
   import system.dispatcher
 
-  val dashboardId = ""
-  val passwd = ""
-
+  // TODO externalize this
+  val dashboardId = "mail"
+  val passwd = "#sc0rsese!"
   val baseHref = "https://dashboard-api-test.chaordicsystems.com/v2/kpi"
 
-  //search/kpi_test
     /**
      * Send a Daily Fact to DashboardAPI
      *
@@ -33,9 +32,13 @@ object DashboardAPI {
      *
      * @return a future with the result of this operation.
      */
-  def dailyFact(product: String, kpi: String, resultPoint: ResultPoint): Future[HttpResponse] = {
-    // TODO: need to change key to day or create a case class for sending it
-    dashboardPipeline(Post(s"$baseHref/$product/$kpi", resultPoint))
+  def dailyFact(product: String, kpi: String, resultPoint: ResultPoint): Future[Unit] = {
+    dashboardPipeline(Post(s"$baseHref/$product/$kpi", resultPoint)).flatMap { response =>
+      if (response.status.isSuccess)
+        Future.successful()
+      else
+        Future.failed(new RuntimeException(s"Fail to save product = $product, kpi = $kpi, resultPoint = $resultPoint"))
+    }
   }
 
   /**
@@ -43,15 +46,18 @@ object DashboardAPI {
    *
    * @param product Product identification on dashboard
    * @param kpi KPI to delete metric
-   * @param clients Set of clients
    * @param interval Interval to delete
    * @return a future with the result of this operation
    */
 
-  def deleteDailyFact(product: String, kpi: String, clients: Set[String],
-                       interval: Interval): Future[HttpResponse] = {
-    dashboardPipeline(
-      Delete(s"""$baseHref/$product/$kpi?from=${interval.getStart}&to=${interval.getEnd}&client=${clients.mkString(",")}"""))
+  def deleteDailyFact(product: String, kpi: String, interval: Interval): Future[Unit] = {
+    val url = s"""$baseHref/$product/$kpi?from=${interval.getStart.toString("yyyy-MM-dd")}&to=${interval.getEnd.toString("yyyy-MM-dd")}"""
+    dashboardPipeline(Delete(url)).flatMap { response =>
+      if (response.status.isSuccess)
+        Future.successful()
+      else
+        Future.failed(new RuntimeException(s"Fail to cleanup metrics for product = $product, kpi = $kpi, interval = $interval"))
+    }
   }
 
   val dashboardPipeline: SendReceive = (
@@ -61,4 +67,3 @@ object DashboardAPI {
     )
 
 }
-
