@@ -1,18 +1,13 @@
 package ignition.jobs
 
-
 import ignition.chaordic.pojo.Transaction
 import ignition.jobs.TransactionETL.MetricByDate
+import ignition.jobs.utils.DashboardAPI.ResultPoint
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import spray.json.DefaultJsonProtocol
 
-case class ResultPoint(client: String, day: String, value: Double)
 case class ETLResult(salesSearch: RDD[ResultPoint], salesOverall: RDD[ResultPoint])
-
-object TransactionETLProtocol extends DefaultJsonProtocol {
-  implicit val resultPointFormat = jsonFormat3(ResultPoint)
-}
 
 object TransactionETL {
 
@@ -37,7 +32,7 @@ object TransactionETL {
   }
 
   /**
-   * Calculate the monetary value given bt all transactions that search was involved aggregated by day.
+   * Calculate the monetary value given by all transactions that search was involved aggregated by day.
    * @param transactions All transactions of a client.
    * @return RDD of (date, cash)
    */
@@ -48,7 +43,7 @@ object TransactionETL {
       .reduceByKey(_ + _)
 
   /**
-   * Calculate the monetary value given bt all transactions aggregated by day.
+   * Calculate the monetary value given by all transactions aggregated by day.
    * @param transactions All transactions of a client.
    * @return RDD of (date, cash)
    */

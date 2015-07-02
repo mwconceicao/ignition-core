@@ -1,27 +1,34 @@
 package ignition.jobs.utils
 
 import akka.actor.ActorSystem
-import ignition.jobs.ResultPoint
+import ignition.jobs.Configuration
+import ignition.jobs.utils.DashboardAPI.ResultPoint
 import org.joda.time.Interval
 import spray.client.pipelining.{SendReceive, _}
 import spray.http._
 import spray.http.ContentTypes.`application/json`
 import spray.httpx.SprayJsonSupport._
+import spray.json.DefaultJsonProtocol
 
 import scala.concurrent.Future
 import scala.language.{implicitConversions, postfixOps}
 
+object DashboardAPIProtocol extends DefaultJsonProtocol {
+  implicit val resultPointFormat = jsonFormat3(ResultPoint)
+}
+
 object DashboardAPI {
 
-  import ignition.jobs.TransactionETLProtocol._
+  import DashboardAPIProtocol._
+
+  case class ResultPoint(client: String, day: String, value: Double)
 
   implicit val system = ActorSystem("dashboard-api")
   import system.dispatcher
 
-  // TODO externalize this
-  val dashboardId = "mail"
-  val passwd = "#sc0rsese!"
-  val baseHref = "https://dashboard-api-test.chaordicsystems.com/v2/kpi"
+  val user = Configuration.dashboardApiUser
+  val password = Configuration.dashboardApiPassword
+  val baseHref = s"${Configuration.dashboardApiUrl}/v2/kpi"
 
     /**
      * Send a Daily Fact to DashboardAPI
@@ -62,7 +69,7 @@ object DashboardAPI {
 
   val dashboardPipeline: SendReceive = (
     addHeader(HttpHeaders.`Content-Type`(`application/json`)) ~>
-    addCredentials(BasicHttpCredentials(dashboardId, passwd))
+    addCredentials(BasicHttpCredentials(user, password))
       ~> sendReceive
     )
 

@@ -9,8 +9,9 @@ import ignition.chaordic.{Chaordic, ParsingReporter}
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.jobs.setups.SitemapXMLSetup._
+import ignition.jobs.utils.DashboardAPI.ResultPoint
 import ignition.jobs.utils.{DashboardAPI, SearchApi}
-import ignition.jobs.{ResultPoint, TransactionETL}
+import ignition.jobs.TransactionETL
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -28,7 +29,7 @@ import scala.util.control.NonFatal
  * It consist of two basic metrics:
  *  - searchSales: Monetary value of all the transactions that search was involved (done by checking the
  *                 `cssearch` field on info, that tagged by Onsite).
- *  - searchParticipationRatio: This correspond to ratio between sales that search was involved and all sales.
+ *  - overallSales: Monetary value of all captured transactions.
  */
 
 object TransactionETLSetup {
@@ -76,9 +77,15 @@ object TransactionETLSetup {
   def saveMetrics(kpi: String, start: DateTime, end: DateTime, points: Seq[ResultPoint]): Future[Unit] = {
     DashboardAPI.deleteDailyFact("search", kpi, new Interval(start, end)).flatMap { response =>
       logger.info(s"Cleanup for kpi = $kpi, start = $start, end = $end")
-      Future.sequence(points.map(point => DashboardAPI.dailyFact("search", kpi, point))).map { _ =>
-        logger.info(s"Kpi $kpi saved")
+      Future.sequence(points.map(point => saveResultPoint(kpi, point))).map { _ =>
+        logger.info(s"All kpi $kpi saved")
       }
+    }
+  }
+
+  def saveResultPoint(kpi: String, resultPoint: ResultPoint): Future[Unit] = {
+    DashboardAPI.dailyFact("search", kpi, resultPoint).map { _ =>
+      logger.info(s"Kpi $kpi for client ${resultPoint.client} at day ${resultPoint.day} with value ${resultPoint.value} saved.")
     }
   }
 

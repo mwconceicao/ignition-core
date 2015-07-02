@@ -2,13 +2,13 @@ package ignition.jobs
 
 import ignition.chaordic.pojo.ChaordicGenerators
 import ignition.chaordic.pojo.ChaordicGenerators.TimeUnits
-import ignition.chaordic.utils.Json
 import ignition.core.testsupport.spark.SharedSparkContext
 import ignition.core.utils.BetterTrace
 import ignition.jobs.TransactionETL.ETLTransaction
 import org.scalacheck.Gen
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FlatSpec, ShouldMatchers}
+import org.scalautils.TolerantNumerics
 import scala.language.postfixOps
 
 class TransactionETLTest extends FlatSpec with ShouldMatchers with SharedSparkContext
@@ -20,9 +20,7 @@ class TransactionETLTest extends FlatSpec with ShouldMatchers with SharedSparkCo
     ChaordicGenerators.transactionGenerator(gInfo = Gen.const(Map("cssearch" -> "")))
   ).map(sc.parallelize(_))
 
-  implicit class DoubleComparison(target: Double) {
-    def ~=(another: Double, precision: Double = 0.001) = (target - another).abs < precision
-  }
+  implicit val doubleEquality = TolerantNumerics.tolerantDoubleEquality(0.001)
 
   "ETLTransaction" should "calculate how much money it have" in {
     forAll(transactionGenerator) {
@@ -35,7 +33,7 @@ class TransactionETLTest extends FlatSpec with ShouldMatchers with SharedSparkCo
           } yield quantity * price
         }.sum
 
-        (transaction.cashFromTransaction ~= cash) shouldBe true
+        transaction.cashFromTransaction === cash
       }
     }
   }
@@ -46,7 +44,7 @@ class TransactionETLTest extends FlatSpec with ShouldMatchers with SharedSparkCo
         val sumOfRDD = TransactionETL.calculateSearchSales(transactions).map(_._2).sum()
         val sumOfRaw = transactions.map(_.cashFromTransaction).sum()
 
-        (sumOfRDD ~= sumOfRaw) shouldBe true
+        sumOfRDD === sumOfRaw
     }
   }
 
@@ -82,7 +80,7 @@ class TransactionETLTest extends FlatSpec with ShouldMatchers with SharedSparkCo
         val sumOfRDD = TransactionETL.calculateOverallSales(transactions).map(_._2).sum()
         val sumOfRaw = transactions.map(_.cashFromTransaction).sum()
 
-        (sumOfRDD ~= sumOfRaw) shouldBe true
+        sumOfRDD === sumOfRaw
     }
   }
 
