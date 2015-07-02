@@ -80,7 +80,11 @@ object MainIndicators extends SearchETL {
    * @param day Date Aggregation
    * @param searchId SearchId that was generated for that event.
    */
-  case class MainIndicatorKey(client: String, feature: String, day: String, searchId: String)
+  case class MainIndicatorKey(client: String, feature: String, day: String, searchId: String) {
+    def toResultPoint(value: Int): ResultPoint = {
+      ResultPoint(day, client, value)
+    }
+  }
   object MainIndicatorKey {
     def apply(event: SearchEvent): MainIndicatorKey = {
       MainIndicatorKey(
@@ -89,6 +93,7 @@ object MainIndicators extends SearchETL {
         event.date.toString(aggregationLevel),
         event.searchId)
     }
+
   }
 
   /**
@@ -120,43 +125,68 @@ object MainIndicators extends SearchETL {
    * @tparam T Class that extends SearchEvent
    * @return Count of events that share the same MainIndicatorKey.
    */
-
   def getMetrics[T <: SearchEvent:ClassTag](events: RDD[T]): RDD[(MainIndicatorKey, Int)] = {
     events
       .map(event => (MainIndicatorKey(event), 1))
       .reduceByKey(_ + _)
   }
 
+  /**
+   * Calculate Unique metrics this should be used for events that are not autocomplete.
+   * This aggregate metrics for search (without redirects) and aggregate them yielding 1
+   * for each distinct MainIndicator.
+   *
+   * @param events List of events.
+   * @tparam T Class that extends SearchEvent
+   * @return
+   */
   def getUniqueMetrics[T <: SearchEvent:ClassTag](events: RDD[T]): RDD[(MainIndicatorKey, Int)] = {
     events
       .filter(event => event.feature != "redirect")
       .map(MainIndicatorKey(_))
       .distinct()
       .map(event => (event, 1))
-      // TODO: should I use a tuple?
   }
 
-  def process(searchLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): Unit = {
+  /**
+   * Filter invalid searchlogs.
+   * @param searchLogs all searchlogs
+   * @return Only Valid Searchlogs.
+   */
 
-    val validSearchLogs = searchLogs
+  def getValidSearchLogs(searchLogs: RDD[SearchLog]) =
+    searchLogs
       .filter(_.valid(invalidBrowsers, invalidIps))
       .filter(_.page == 1)
 
-    val validClickLogs: RDD[SearchClickLog] = clickLogs
+  def getValidClickLogs(clickLogs: RDD[SearchClickLog]) =
+    clickLogs
       .filter(_.valid(invalidBrowsers, invalidIps))
 
+  def process(searchLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): Unit = {
+
+    val validSearchLogs = getValidSearchLogs(searchLogs)
+
+    val validClickLogs: RDD[SearchClickLog] = getValidClickLogs(clickLogs)
 
     // AutoComplete
     val autoCompleteEvents: RDD[SearchLog] = getUniqueEventFromAutoComplete(validSearchLogs)
     val autoCompleteClicks: RDD[SearchClickLog] =  getUniqueEventFromAutoComplete(validClickLogs)
+    // AUTOCOMPLETE EVENTS
+    val autoCompleteEventMetrics: RDD[(MainIndicatorKey, Int)] = getMetrics(autoCompleteEvents)
+    // Don't contain redirects
+    val autoCompleteUniqueEventMetrics: RDD[(MainIndicatorKey, Int)] = getUniqueMetrics(autoCompleteEvents)
+
+    // AUTOCOMPLETE CLICKS
+    val autoCompleteClickEventMetrics: RDD[(MainIndicatorKey, Int)] = getMetrics(autoCompleteClicks)
+    // Don't contain redirects
+    val autoCompleteClickUniqueEventMetrics: RDD[(MainIndicatorKey, Int)] = getUniqueMetrics(autoCompleteClicks)
+
 
     // Search
     // Counts All Search + Redirects
-    val searchEvents: RDD[SearchLog] = validSearchLogs
-      .filter(searchLog => searchLog.feature != "autocomplete")
-
-    val searchClicks: RDD[SearchClickLog] = validClickLogs
-      .filter(clickLog => clickLog.feature != "autocomplete")
+    val searchEvents: RDD[SearchLog] = validSearchLogs.filter(searchLog => searchLog.feature != "autocomplete")
+    val searchClicks: RDD[SearchClickLog] = validClickLogs.filter(clickLog => clickLog.feature != "autocomplete")
 
     // SEARCH EVENTS
     // Contains redirects
@@ -168,17 +198,6 @@ object MainIndicators extends SearchETL {
     val searchClickEventMetrics: RDD[(MainIndicatorKey, Int)] = getMetrics(searchClicks)
     // Don't contain redirects
     val searchClickUniqueEventMetrics: RDD[(MainIndicatorKey, Int)] = getUniqueMetrics(searchClicks)
-
-    // AUTOCOMPLETE EVENTS
-    val autoCompleteEventMetrics: RDD[(MainIndicatorKey, Int)] = getMetrics(autoCompleteEvents)
-    // Don't contain redirects
-    val autoCompleteUniqueEventMetrics: RDD[(MainIndicatorKey, Int)] = getUniqueMetrics(autoCompleteEvents)
-
-    // AUTOCOMPLETE CLICKS
-    val autoCompleteClickEventMetrics: RDD[(MainIndicatorKey, Int)] = getMetrics(autoCompleteClicks)
-    // Don't contain redirects
-    val autoCompleteClickUniqueEventMetrics: RDD[(MainIndicatorKey, Int)] = getUniqueMetrics(autoCompleteClicks)
-
   }
 
 
