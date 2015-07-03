@@ -41,7 +41,7 @@ object TopQueriesJob {
     def normalizedQuery: String = HtmlUtils.stripHtml(searchLog.query)
     def searchId: String = searchLog.info.getOrElse("searchId", "")
     def realFeature: String = if (validFeatures.contains(searchLog.feature)) searchLog.feature else "search"
-    def hasResult: Boolean = searchLog.totalFound == 0
+    def hasResult: Boolean = searchLog.totalFound > 0
     def isValidFeature: Boolean = if (searchLog.realFeature == "autocomple" && !searchLog.hasResult) false else true
   }
 
@@ -67,6 +67,7 @@ object TopQueriesJob {
     searchLogByKey.map {
       case (key @ SearchKey(_, "autocomplete", _), events) =>
         (key, events.toSeq.sortBy(_.query.length).reverse.lastOption.toSeq)
+      case other => other
     }
 
   def transformSearchLogsToHashesByQueryId(searchLogByKey: RDD[(SearchKey, Iterable[SearchLog])]): RDD[(QueryKey, Iterable[String])] =
