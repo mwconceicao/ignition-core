@@ -1,6 +1,7 @@
 package ignition.jobs
 
 import ignition.chaordic.pojo.{SearchEvent, SearchClickLog, SearchLog}
+import ignition.jobs.utils.DashboardAPI.ResultPoint
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 
@@ -127,7 +128,7 @@ object MainIndicators extends SearchETL {
    */
   def getMetrics[T <: SearchEvent:ClassTag](events: RDD[T]): RDD[(MainIndicatorKey, Int)] = {
     events
-      .map(event => (MainIndicatorKey(event), 1))
+      .map(event => (MainIndicatorKey(event).copy(searchId = "daily"), 1))
       .reduceByKey(_ + _)
   }
 
@@ -145,7 +146,9 @@ object MainIndicators extends SearchETL {
       .filter(event => event.feature != "redirect")
       .map(MainIndicatorKey(_))
       .distinct()
+      .map(_.copy(searchId = "daily"))
       .map(event => (event, 1))
+      .reduceByKey(_ + _)
   }
 
   /**
@@ -153,7 +156,6 @@ object MainIndicators extends SearchETL {
    * @param searchLogs all searchlogs
    * @return Only Valid Searchlogs.
    */
-
   def getValidSearchLogs(searchLogs: RDD[SearchLog]) =
     searchLogs
       .filter(_.valid(invalidBrowsers, invalidIps))
@@ -163,14 +165,17 @@ object MainIndicators extends SearchETL {
     clickLogs
       .filter(_.valid(invalidBrowsers, invalidIps))
 
-  def process(searchLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): Unit = {
+  def process(searchLogs: RDD[SearchLog], autoCompleteLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): List[RDD[(MainIndicatorKey, Int)]] = {
 
     val validSearchLogs = getValidSearchLogs(searchLogs)
 
+    val validAutoCompleteLogs = getValidSearchLogs(autoCompleteLogs)
+
     val validClickLogs: RDD[SearchClickLog] = getValidClickLogs(clickLogs)
 
+
     // AutoComplete
-    val autoCompleteEvents: RDD[SearchLog] = getUniqueEventFromAutoComplete(validSearchLogs)
+    val autoCompleteEvents: RDD[SearchLog] = getUniqueEventFromAutoComplete(validAutoCompleteLogs)
     val autoCompleteClicks: RDD[SearchClickLog] =  getUniqueEventFromAutoComplete(validClickLogs)
     // AUTOCOMPLETE EVENTS
     val autoCompleteEventMetrics: RDD[(MainIndicatorKey, Int)] = getMetrics(autoCompleteEvents)
@@ -198,6 +203,16 @@ object MainIndicators extends SearchETL {
     val searchClickEventMetrics: RDD[(MainIndicatorKey, Int)] = getMetrics(searchClicks)
     // Don't contain redirects
     val searchClickUniqueEventMetrics: RDD[(MainIndicatorKey, Int)] = getUniqueMetrics(searchClicks)
+
+    List(
+      searchEventMetrics,
+      searchUniqueMetrics,
+      searchClickEventMetrics,
+      searchClickUniqueEventMetrics,
+      autoCompleteEventMetrics,
+      autoCompleteUniqueEventMetrics,
+      autoCompleteClickEventMetrics,
+      autoCompleteClickUniqueEventMetrics)
   }
 
 

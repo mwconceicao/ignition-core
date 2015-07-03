@@ -14,6 +14,7 @@ object Runner {
     // Main jobs
     ("SitemapXMLSetup", (context => SitemapXMLSetup.run(context), Map.empty)),
     ("TransactionETLSetup", (context => TransactionETLSetup.run(context), Map.empty)),
+    ("MainIndicatorsSetup", (context => MainIndicatorsSetup.run(context), Map.empty)),
     ("TopQueriesSetup", (context => TopQueriesSetup.run(context), Map.empty)),
     ("AnotherSetup", (context => WordCountSetup.run(context), Map.empty)) // FIXME
   )

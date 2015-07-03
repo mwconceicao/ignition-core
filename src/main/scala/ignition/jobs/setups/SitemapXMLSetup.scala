@@ -29,18 +29,9 @@ object SitemapXMLSetup extends ExecutionRetry {
 
   private lazy val logger = LoggerFactory.getLogger("ignition.SitemapXMLSetup")
 
-
   def parseProducts(rdd: RDD[String]): RDD[Product] = rdd.map { line =>
     Chaordic.parseWith(line, new ProductV1Parser, new ProductV2Parser)
   }.collect { case Success(v) => v.fold(identity, identity) }
-
-  def parseSearchLogs(rdd: RDD[String]): RDD[SearchLog] = rdd.map { line =>
-    Chaordic.parseWith(line, new SearchLogParser)
-  }.collect { case Success(v) => v }
-
-  def parseSearchClickLogs(rdd: RDD[String]): RDD[SearchClickLog] = rdd.map { line =>
-    Chaordic.parseWith(line, new SearchClickLogParser)
-  }.collect { case Success(v) => v }
 
   def run(runnerContext: RunnerContext) {
 
@@ -76,13 +67,13 @@ object SitemapXMLSetup extends ExecutionRetry {
 
     logger.info(s"Do we need search logs? $willNeedSearch")
     val parsedClickLogs = if (willNeedSearch)
-      parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
+      SearchClickLogParser.parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
         endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist(StorageLevel.MEMORY_AND_DISK)
     else
       sc.emptyRDD[SearchClickLog]
 
     val parsedSearchLogs = if (willNeedSearch)
-      parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
+      SearchLogParser.parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
         endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist(StorageLevel.MEMORY_AND_DISK)
     else
       sc.emptyRDD[SearchLog]

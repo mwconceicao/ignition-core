@@ -1,18 +1,16 @@
 package ignition.jobs
 
 import ignition.chaordic.pojo.Transaction
-import ignition.jobs.TransactionETL.MetricByDate
 import ignition.jobs.utils.DashboardAPI.ResultPoint
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import spray.json.DefaultJsonProtocol
 
 case class ETLResult(salesSearch: RDD[ResultPoint], salesOverall: RDD[ResultPoint])
 
-object TransactionETL {
+
+object TransactionETL extends SearchETL {
 
   type MetricByDate = ((String, String), Double)
-  val aggregationLevel = "yyyy-MM-dd"
 
   implicit class ETLTransaction(transaction: Transaction) {
     def cashFromTransaction: Double = {

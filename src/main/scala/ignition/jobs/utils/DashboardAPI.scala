@@ -2,26 +2,49 @@ package ignition.jobs.utils
 
 import akka.actor.ActorSystem
 import ignition.jobs.Configuration
-import ignition.jobs.utils.DashboardAPI.ResultPoint
+import ignition.jobs.utils.DashboardAPI.{DashPoint, FeaturedResultPoint, ResultPoint}
 import org.joda.time.Interval
 import spray.client.pipelining.{SendReceive, _}
 import spray.http._
 import spray.http.ContentTypes.`application/json`
 import spray.httpx.SprayJsonSupport._
-import spray.json.DefaultJsonProtocol
+import spray.json.{JsValue, RootJsonFormat, DefaultJsonProtocol}
 
 import scala.concurrent.Future
 import scala.language.{implicitConversions, postfixOps}
 
+
 object DashboardAPIProtocol extends DefaultJsonProtocol {
   implicit val resultPointFormat = jsonFormat3(ResultPoint)
+  implicit val resultPointWithFeatureFormat = jsonFormat4(FeaturedResultPoint)
 }
 
 object DashboardAPI {
 
   import DashboardAPIProtocol._
 
-  case class ResultPoint(client: String, day: String, value: Double)
+  sealed trait DashPoint {
+    val client: String
+    val day: String
+    val value: Double
+  }
+
+  case class ResultPoint(client: String, day: String, value: Double) extends DashPoint
+  case class FeaturedResultPoint(client: String, day: String, value: Double,
+                                 feature: String) extends DashPoint
+
+  implicit object DashPointFormat extends RootJsonFormat[DashPoint] {
+    import spray.json._
+    override def read(json: JsValue): DashPoint = json.asJsObject.getFields("feature") match {
+      case seq if seq.size == 1 => json.convertTo[FeaturedResultPoint]
+      case _ => json.convertTo[ResultPoint]
+    }
+
+    override def write(obj: DashPoint): JsValue = obj match {
+      case point: ResultPoint => point.toJson
+      case point: FeaturedResultPoint => point.toJson
+    }
+  }
 
   implicit val system = ActorSystem("dashboard-api")
   import system.dispatcher
@@ -30,16 +53,16 @@ object DashboardAPI {
   val password = Configuration.dashboardApiPassword
   val baseHref = s"${Configuration.dashboardApiUrl}/v2/kpi"
 
-    /**
-     * Send a Daily Fact to DashboardAPI
-     *
-     * @param product Product identification on dashboard
-     * @param kpi KPI to send metric
-     * @param resultPoint Metric to send
-     *
-     * @return a future with the result of this operation.
-     */
-  def dailyFact(product: String, kpi: String, resultPoint: ResultPoint): Future[Unit] = {
+  /**
+   * Send a Daily Fact to DashboardAPI
+   *
+   * @param product Product identification on dashboard
+   * @param kpi KPI to send metric
+   * @param resultPoint Metric to send
+   *
+   * @return a future with the result of this operation.
+   */
+  def dailyFact(product: String, kpi: String, resultPoint: DashPoint): Future[Unit] = {
     dashboardPipeline(Post(s"$baseHref/$product/$kpi", resultPoint)).flatMap { response =>
       if (response.status.isSuccess)
         Future.successful()
