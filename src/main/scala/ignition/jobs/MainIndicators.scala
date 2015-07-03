@@ -1,9 +1,8 @@
 package ignition.jobs
 
-import ignition.chaordic.pojo.{SearchEvent, SearchClickLog, SearchLog}
+import ignition.chaordic.pojo.{SearchLog, SearchClickLog, SearchEvent}
 import ignition.jobs.utils.DashboardAPI.ResultPoint
 import org.apache.spark.rdd.RDD
-import org.joda.time.DateTime
 
 import scala.reflect.ClassTag
 

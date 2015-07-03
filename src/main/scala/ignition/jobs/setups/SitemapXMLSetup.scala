@@ -10,8 +10,6 @@ import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.core.utils.DateUtils._
 import ignition.core.utils.S3Client
 import ignition.jobs._
-import ignition.jobs.pojo.Parsers.{SearchLogParser, SearchClickLogParser}
-import ignition.jobs.pojo.{SearchClickLog, SearchLog}
 import ignition.jobs.utils.SearchApi
 import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.apache.hadoop.io.compress.GzipCodec

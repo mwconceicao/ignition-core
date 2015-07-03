@@ -2,47 +2,27 @@ package ignition.jobs
 
 import java.security.MessageDigest
 
-import ignition.chaordic.utils.Json
-import ignition.jobs.pojo.SearchLog
-import ignition.jobs.utils.HtmlUtils
+import ignition.chaordic.pojo._
+import ignition.chaordic.utils.{HtmlUtils, Json}
 import org.apache.commons.codec.binary.Hex
 import org.apache.spark.rdd.RDD
 
-object TopQueriesJob {
+object TopQueriesJob extends SearchETL {
 
-  case class QueryCount(query: String, count: Long)
-  case class TopQueries(apiKey: String, day: String, hasResult: Boolean, topQueries: Seq[QueryCount])
-  case class SearchKey(apiKey: String, feature: String, searchId: String)
-  case class QueryKey(apiKey: String, day: String, query: String, hasResult: Boolean)
+  private val invalidQueries = Set("pigdom")
+  private val invalidIpAddresses = Set("107.170.51.250")
 
-  // TODO move this to a common place
   implicit class SearchLogEnhancements(searchLog: SearchLog) {
-
-    // TODO should create a external blacklist for browsers and ip addresses?
-    private val invalidBrowsers = Set("pingdombot", "googlebot", "bingbot", "facebookbot")
-    private val invalidBrowsersPattern = "bot"
-    private val invalidQueries = Set("pigdom")
-    private val invalidIpAddresses = Set("107.170.51.250")
 
     private val validFeatures = Set("autocomplete", "redirect")
 
-    def isValid: Boolean = {
-      val browser = searchLog.info.getOrElse("browser_family", "").toLowerCase
-      val ip = searchLog.info.getOrElse("ip", "")
-      val validQuery = !invalidQueries.contains(searchLog.query)
-      val validBrowser = !invalidBrowsers.contains(browser) || !browser.contains(invalidBrowsersPattern)
-      val validIpAddress = !invalidIpAddresses.contains(ip)
-      validQuery && validBrowser && validIpAddress
-    }
-
-    def dayKey: String = searchLog.date.toString("yyyy-MM-dd")
     def searchKey = SearchKey(apiKey = searchLog.apiKey, feature = searchLog.realFeature, searchId = searchLog.searchId)
-    def queryKey = QueryKey(apiKey = searchLog.apiKey, day = searchLog.dayKey, query = searchLog.normalizedQuery, hasResult = searchLog.hasResult)
+    def queryKey = QueryKey(apiKey = searchLog.apiKey, day = searchLog.date.toString(aggregationLevel), query = searchLog.normalizedQuery, hasResult = searchLog.hasResult)
     def normalizedQuery: String = HtmlUtils.stripHtml(searchLog.query)
     def searchId: String = searchLog.info.getOrElse("searchId", "")
     def realFeature: String = if (validFeatures.contains(searchLog.feature)) searchLog.feature else "search"
     def hasResult: Boolean = searchLog.totalFound > 0
-    def isValidFeature: Boolean = if (searchLog.realFeature == "autocomple" && !searchLog.hasResult) false else true
+    def isValidFeature: Boolean = if (searchLog.realFeature == "autocomplete" && !searchLog.hasResult) false else true
   }
 
   def buildHash(searchLog: SearchLog): String = {
@@ -60,7 +40,7 @@ object TopQueriesJob {
 
   def filterValidEvents(searchLogs: RDD[SearchLog]): RDD[SearchLog] =
     searchLogs
-      .filter(_.isValid)
+      .filter(_.valid(invalidQueries, invalidIpAddresses))
       .filter(_.isValidFeature)
 
   def fixAutocompleteDuplication(searchLogByKey: RDD[(SearchKey, Iterable[SearchLog])]): RDD[(SearchKey, Iterable[SearchLog])] =
