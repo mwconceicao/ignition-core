@@ -66,11 +66,11 @@ object MainIndicators extends SearchETL {
 
 
   /** Utilities for Validation **/
-  val invalidBrowsers = Set("pingdombot", "googlebot", "bingbot", "facebookbot")
-  val invalidIps = Set("107.170.51.250")
+  private val invalidQueries = Set("pingdom")
+  private val invalidIps = Set("107.170.51.250")
 
-  val features = Set("autocomplete", "redirect")
-  val nonUniqueMetrics = Set("redirect")
+  private val features = Set("autocomplete", "redirect")
+  private val nonUniqueMetrics = Set("redirect")
 
   /**
    * Case class for holding our keys. It is used all around this job as key for sorting and getting unique events.
@@ -157,12 +157,12 @@ object MainIndicators extends SearchETL {
    */
   def getValidSearchLogs(searchLogs: RDD[SearchLog]) =
     searchLogs
-      .filter(_.valid(invalidBrowsers, invalidIps))
+      .filter(_.valid(invalidQueries, invalidIps))
       .filter(_.page == 1)
 
   def getValidClickLogs(clickLogs: RDD[SearchClickLog]) =
     clickLogs
-      .filter(_.valid(invalidBrowsers, invalidIps))
+      .filter(_.valid(invalidQueries, invalidIps))
 
   def process(searchLogs: RDD[SearchLog], autoCompleteLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): List[RDD[(MainIndicatorKey, Int)]] = {
 
