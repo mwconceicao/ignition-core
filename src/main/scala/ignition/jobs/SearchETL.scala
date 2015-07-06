@@ -6,7 +6,7 @@ import ignition.chaordic.utils.ChaordicPathDateExtractor._
 import ignition.chaordic.{Chaordic, ParsingReporter}
 import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.jobs.utils.DashboardAPI
-import ignition.jobs.utils.DashboardAPI.ResultPoint
+import ignition.jobs.utils.DashboardAPI.{DashPoint, ResultPoint}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.{DateTime, Interval}
@@ -21,7 +21,7 @@ trait SearchETL {
 
   val aggregationLevel = "yyyy-MM-dd"
 
-  def saveMetrics(kpi: String, start: DateTime, end: DateTime, points: Seq[ResultPoint])(implicit ec: ExecutionContext): Future[Unit] = {
+  def saveMetrics(kpi: String, start: DateTime, end: DateTime, points: Seq[DashPoint])(implicit ec: ExecutionContext): Future[Unit] = {
     DashboardAPI.deleteDailyFact("search", kpi, new Interval(start, end)).flatMap { response =>
       logger.info(s"Cleanup for kpi = $kpi, start = $start, end = $end")
       Future.sequence(points.map(point => saveResultPoint(kpi, point))).map { _ =>
@@ -30,7 +30,7 @@ trait SearchETL {
     }
   }
 
-  def saveResultPoint(kpi: String, resultPoint: ResultPoint)(implicit ec: ExecutionContext): Future[Unit] = {
+  def saveResultPoint(kpi: String, resultPoint: DashPoint)(implicit ec: ExecutionContext): Future[Unit] = {
     DashboardAPI.dailyFact("search", kpi, resultPoint).map { _ =>
       logger.info(s"Kpi $kpi for client ${resultPoint.client} at day ${resultPoint.day} with value ${resultPoint.value} saved.")
     }

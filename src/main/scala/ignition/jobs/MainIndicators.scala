@@ -1,7 +1,7 @@
 package ignition.jobs
 
 import ignition.chaordic.pojo.{SearchLog, SearchClickLog, SearchEvent}
-import ignition.jobs.utils.DashboardAPI.ResultPoint
+import ignition.jobs.utils.DashboardAPI.{FeaturedResultPoint, ResultPoint}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -83,6 +83,10 @@ object MainIndicators extends SearchETL {
   case class MainIndicatorKey(client: String, feature: String, day: String, searchId: String) {
     def toResultPoint(value: Int): ResultPoint = {
       ResultPoint(day, client, value)
+    }
+
+    def toFeaturedResultPoint(value: Int): FeaturedResultPoint = {
+      FeaturedResultPoint(client, day, value, feature)
     }
   }
   object MainIndicatorKey {
@@ -173,7 +177,7 @@ object MainIndicators extends SearchETL {
     clickLogs
       .filter(_.valid(invalidQueries, invalidIps))
 
-  def process(searchLogs: RDD[SearchLog], autoCompleteLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): List[RDD[(MainIndicatorKey, Int)]] = {
+  def process(searchLogs: RDD[SearchLog], autoCompleteLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): MainIndicatorsResults = {
 
     val validSearchLogs = getValidSearchLogs(searchLogs)
 
@@ -212,25 +216,26 @@ object MainIndicators extends SearchETL {
     // Don't contain redirects
     val searchClickUniqueEventMetrics: RDD[(MainIndicatorKey, Int)] = getUniqueMetrics(searchClicks)
 
-//    MainIndicatorsResults(searchEventMetrics,searchUniqueMetrics,searchClickEventMetrics,autoCompleteEventMetrics,autoCompleteUniqueEventMetrics,autoCompleteClickEventMetrics)
-    //List(searchEventMetrics,searchUniqueMetrics,searchClickEventMetrics, searchClickUniqueEventMetrics, autoCompleteEventMetrics,autoCompleteUniqueEventMetrics,autoCompleteClickEventMetrics, autoCompleteClickUniqueEventMetrics)
-    List(searchClickUniqueEventMetrics)
+    MainIndicatorsResults(
+      searchEventMetrics,
+      searchUniqueMetrics,
+      searchClickEventMetrics,
+      searchClickUniqueEventMetrics,
+      autoCompleteEventMetrics,
+      autoCompleteUniqueEventMetrics,
+      autoCompleteClickEventMetrics,
+      autoCompleteClickUniqueEventMetrics)
+
   }
 
-  /**
-   * Utility Case Class to Return output.
-   * @param searchMetrics Search Metrics (All search + redirect)
-   * @param searchUniqueMetrics Unique Metrics (no redirects)
-   * @param searchClickMetrics Click Metrics
-   * @param autoCompleteMetrics AutoComplete Metrics
-   * @param autoCompleteUniqueMetrics Unique AutoComplete metrics
-   * @param autoCompleteClickMetrics AutoComplete Click Metrics
-   */
+  /** Utility Case Class to Return output. */
   case class MainIndicatorsResults(searchMetrics: RDD[(MainIndicatorKey, Int)],
                                    searchUniqueMetrics: RDD[(MainIndicatorKey, Int)],
                                    searchClickMetrics: RDD[(MainIndicatorKey, Int)],
+                                   searchClickUniqueMetrics: RDD[(MainIndicatorKey, Int)],
                                    autoCompleteMetrics: RDD[(MainIndicatorKey, Int)],
                                    autoCompleteUniqueMetrics : RDD[(MainIndicatorKey, Int)],
-                                   autoCompleteClickMetrics: RDD[(MainIndicatorKey, Int)])
+                                   autoCompleteClickMetrics: RDD[(MainIndicatorKey, Int)],
+                                   autoCompleteUniqueClickMetrics: RDD[(MainIndicatorKey, Int)])
 
 }
