@@ -36,22 +36,22 @@ trait SearchETL {
     }
   }
 
-  def parseAutoCompleteLogs(context: SparkContext, start: DateTime, end: DateTime)(implicit ec: ExecutionContext): RDD[SearchLog] =
+  def parseAutoCompleteLogs(context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] =
     //SearchLogParser.parseSearchLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/autocompletelog/*/*.gz",
     SearchLogParser.parseSearchLogs(context.filterAndGetTextFiles("/Users/flavio/git/search-ignition/events/autocomplete/*/*.gz",
       startDate = Option(start), endDate = Option(end)))
 
-  def parseSearchLogs(context: SparkContext, start: DateTime, end: DateTime)(implicit ec: ExecutionContext): RDD[SearchLog] =
+  def parseSearchLogs(context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] =
     //SearchLogParser.parseSearchLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*/*.gz",
     SearchLogParser.parseSearchLogs(context.filterAndGetTextFiles("/Users/flavio/git/search-ignition/events/searchlog/*/*.gz",
       startDate = Option(start), endDate = Option(end)))
 
-  def parseClickLogs(context: SparkContext, start: DateTime, end: DateTime)(implicit ec: ExecutionContext): RDD[SearchClickLog] =
+  def parseClickLogs(context: SparkContext, start: DateTime, end: DateTime): RDD[SearchClickLog] =
     //SearchClickLogParser.parseSearchClickLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*/*.gz",
     SearchClickLogParser.parseSearchClickLogs(context.filterAndGetTextFiles("/Users/flavio/git/search-ignition/events/clicklog/*/*.gz",
       startDate = Option(start), endDate = Option(end)))
 
-  def parseTransactions(context: SparkContext, start: DateTime, end: DateTime, clients: Set[String])(implicit ec: ExecutionContext): RDD[Transaction] =
+  def parseTransactions(context: SparkContext, start: DateTime, end: DateTime, clients: Set[String]): RDD[Transaction] =
     context.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/buyOrders/*/{${clients.mkString(",")}}.gz",
       endDate = Option(end), startDate = Option(start)).map {
       json => Chaordic.parseWith(json, parser = new TransactionParser, reporter = reporterFor("transaction"))
