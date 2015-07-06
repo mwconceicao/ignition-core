@@ -1,10 +1,7 @@
 package ignition.jobs
 
-import java.security.MessageDigest
-
 import ignition.chaordic.pojo._
-import ignition.chaordic.utils.{HtmlUtils, Json}
-import org.apache.commons.codec.binary.Hex
+import ignition.chaordic.utils.HtmlUtils
 import org.apache.spark.rdd.RDD
 
 object TopQueriesJob extends SearchETL {
@@ -16,26 +13,28 @@ object TopQueriesJob extends SearchETL {
 
     private val validFeatures = Set("autocomplete", "redirect")
 
-    def searchKey = SearchKey(apiKey = searchLog.apiKey, feature = searchLog.realFeature, searchId = searchLog.searchId)
-    def queryKey = QueryKey(apiKey = searchLog.apiKey, day = searchLog.date.toString(aggregationLevel), query = searchLog.normalizedQuery, hasResult = searchLog.hasResult)
-    def normalizedQuery: String = HtmlUtils.stripHtml(searchLog.query)
-    def searchId: String = searchLog.info.getOrElse("searchId", "")
+    def queryKey = QueryKey(
+      apiKey = searchLog.apiKey,
+      day = searchLog.date.withTimeAtStartOfDay.toString,
+      query = searchLog.normalizedQuery,
+      hasResult = searchLog.hasResult)
+
+    def searchKey = SearchKey(
+      apiKey = searchLog.apiKey,
+      feature = searchLog.realFeature,
+      searchId = searchLog.searchId)
+
+    def normalizedQuery: String = HtmlUtils.stripHtml(searchLog.query).toLowerCase
     def realFeature: String = if (validFeatures.contains(searchLog.feature)) searchLog.feature else "search"
     def hasResult: Boolean = searchLog.totalFound > 0
     def isValidFeature: Boolean = if (searchLog.realFeature == "autocomplete" && !searchLog.hasResult) false else true
   }
 
-  def buildHash(searchLog: SearchLog): String = {
-    val json = Json.toJson4sString(searchLog)
-    val digest = MessageDigest.getInstance("SHA1").digest(json.getBytes("UTF-8"))
-    Hex.encodeHexString(digest)
-  }
-
-  def execute(parsedSearchLogs: RDD[SearchLog]): RDD[TopQueries] = {
-    val filtered = filterValidEvents(parsedSearchLogs).keyBy(_.searchKey).groupByKey()
+  def execute(searchLogs: RDD[SearchLog]): RDD[TopQueries] = {
+    val filtered = filterValidEvents(searchLogs).keyBy(_.searchKey).groupByKey()
     val uniqueSearchesByAutocomplete = fixAutocompleteDuplication(filtered)
-    val queryIds = transformSearchLogsToHashesByQueryId(uniqueSearchesByAutocomplete)
-    calculateTopQueries(queryIds)
+    val queries = filterAndGroupQuery(uniqueSearchesByAutocomplete)
+    calculateTopQueries(queries)
   }
 
   def filterValidEvents(searchLogs: RDD[SearchLog]): RDD[SearchLog] =
@@ -50,17 +49,17 @@ object TopQueriesJob extends SearchETL {
       case other => other
     }
 
-  def transformSearchLogsToHashesByQueryId(searchLogByKey: RDD[(SearchKey, Iterable[SearchLog])]): RDD[(QueryKey, Iterable[String])] =
+  def filterAndGroupQuery(searchLogByKey: RDD[(SearchKey, Iterable[SearchLog])]): RDD[(QueryKey, Iterable[SearchLog])] =
     searchLogByKey.flatMap {
       case (searchKey, events) =>
         events
           .filter(_.isValidFeature)
           .filter(event => event.normalizedQuery.nonEmpty && event.page == 1)
-          .map(event => (event.queryKey, buildHash(event)))
+          .map(event => (event.queryKey, event))
     }.groupByKey()
 
-  def calculateTopQueries(hashesByQueryKey: RDD[(QueryKey, Iterable[String])]): RDD[TopQueries] = {
-    val rawTopQueries = hashesByQueryKey.map {
+  def calculateTopQueries(logsByQuery: RDD[(QueryKey, Iterable[SearchLog])]): RDD[TopQueries] = {
+    val rawTopQueries = logsByQuery.map {
       case (QueryKey(apiKey, day, query, hasResult), hashes) =>
         ((apiKey, day, hasResult), QueryCount(query, hashes.size))
     }.groupByKey()
