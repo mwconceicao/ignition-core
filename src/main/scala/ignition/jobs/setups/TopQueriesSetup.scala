@@ -1,32 +1,41 @@
 package ignition.jobs.setups
 
-import ignition.chaordic.pojo.Parsers.SearchLogParser
 import ignition.chaordic.pojo.TopQueries
-import ignition.chaordic.utils.ChaordicPathDateExtractor._
 import ignition.chaordic.utils.Json
 import ignition.core.jobs.CoreJobRunner.RunnerContext
-import ignition.core.jobs.ExecutionRetry
-import ignition.core.jobs.utils.SparkContextUtils._
-import ignition.jobs.TopQueriesJob
-import org.apache.spark.rdd.RDD
+import ignition.jobs.{SearchETL, TopQueriesJob}
+import org.slf4j.LoggerFactory
 
-object TopQueriesSetup extends ExecutionRetry  {
+object TopQueriesSetup extends SearchETL  {
+
+  override lazy val logger = LoggerFactory.getLogger("ignition.TopQueriesSetup")
 
   def run(runnerContext: RunnerContext): Unit = {
-
     val sc = runnerContext.sparkContext
     val config = runnerContext.config
     val now = runnerContext.config.date
+    val start = now.minusDays(1).withTimeAtStartOfDay()
 
-    // "s3n://chaordic-search-logs/searchlog/*"
-    val parsedSearchLogs = SearchLogParser.parseSearchLogs(sc.filterAndGetTextFiles("/home/fparisotto/Temp/search-ignition/s3_cache/*",
-      startDate = Option(now.minusDays(1).withTimeAtStartOfDay()), endDate = Option(now)))
+    logger.info(s"Starting TopQueriesJob for start = $start, end $now")
 
-    val topQueries: RDD[TopQueries] = TopQueriesJob.execute(parsedSearchLogs)
+    val parsedSearchLogs = parseSearchLogs(sc, start = start, end = now)
+    TopQueriesJob.execute(parsedSearchLogs)
+      .repartition(numPartitions = 1)
+      .map(transformToJsonString)
+      .saveAsTextFile(s"s3://chaordic-search-ignition-latest/top-queries/${config.tag}")
 
-    topQueries
-      .map(Json.toJsonString(_))
-      .saveAsTextFile(s"/tmp/TopQueriesSetup/${now.toString}")
+    logger.info(s"TopQueriesJob done.")
+  }
+
+  def transformToJsonString(topQueries: TopQueries): String = {
+    val topQueriesAsMap = Map(
+      "apiKey" -> topQueries.apiKey,
+      "datetime" -> topQueries.day,
+      "queries_has_results" -> topQueries.hasResult,
+      "event" -> "top_queries",
+      "top_queries" -> topQueries.topQueries.map(query =>
+        Map("query" -> query.query, "count" -> query.count)))
+    Json.toJsonString(topQueriesAsMap)
   }
 
 }
