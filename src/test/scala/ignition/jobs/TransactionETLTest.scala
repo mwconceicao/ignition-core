@@ -8,7 +8,7 @@ import ignition.jobs.TransactionETL.ETLTransaction
 import org.scalacheck.Gen
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FlatSpec, ShouldMatchers}
-import org.scalactic.TolerantNumerics
+import org.scalautils.TolerantNumerics
 import scala.language.postfixOps
 
 class TransactionETLTest extends FlatSpec with ShouldMatchers with SharedSparkContext
