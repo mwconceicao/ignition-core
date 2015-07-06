@@ -127,7 +127,12 @@ object MainIndicators extends SearchETL {
    */
   def getMetrics[T <: SearchEvent:ClassTag](events: RDD[T]): RDD[(MainIndicatorKey, Int)] = {
     events
-      .map(event => (MainIndicatorKey(event).copy(searchId = "daily"), 1))
+      .map(event => {
+        if (event.feature != "autocomplete")
+          (MainIndicatorKey(event).copy(searchId = "daily", feature = "search"), 1)
+        else
+          (MainIndicatorKey(event).copy(searchId = "daily"), 1)
+      })
       .reduceByKey(_ + _)
   }
 
@@ -135,6 +140,10 @@ object MainIndicators extends SearchETL {
    * Calculate Unique metrics this should be used for events that are not autocomplete.
    * This aggregate metrics for search (without redirects) and aggregate them yielding 1
    * for each distinct MainIndicator.
+   *
+   * FIXME: Note: We have issues in the code that send metrics. Sometimes there are no searchId, and they are set
+   * to "null", the string with null inside (WTF). Because of that we need to create a hashcode for those events with
+   * null, so we don't
    *
    * @param events List of events.
    * @tparam T Class that extends SearchEvent
@@ -203,16 +212,25 @@ object MainIndicators extends SearchETL {
     // Don't contain redirects
     val searchClickUniqueEventMetrics: RDD[(MainIndicatorKey, Int)] = getUniqueMetrics(searchClicks)
 
-    List(
-      searchEventMetrics,
-      searchUniqueMetrics,
-      searchClickEventMetrics,
-      searchClickUniqueEventMetrics,
-      autoCompleteEventMetrics,
-      autoCompleteUniqueEventMetrics,
-      autoCompleteClickEventMetrics,
-      autoCompleteClickUniqueEventMetrics)
+//    MainIndicatorsResults(searchEventMetrics,searchUniqueMetrics,searchClickEventMetrics,autoCompleteEventMetrics,autoCompleteUniqueEventMetrics,autoCompleteClickEventMetrics)
+    //List(searchEventMetrics,searchUniqueMetrics,searchClickEventMetrics, searchClickUniqueEventMetrics, autoCompleteEventMetrics,autoCompleteUniqueEventMetrics,autoCompleteClickEventMetrics, autoCompleteClickUniqueEventMetrics)
+    List(searchClickUniqueEventMetrics)
   }
 
+  /**
+   * Utility Case Class to Return output.
+   * @param searchMetrics Search Metrics (All search + redirect)
+   * @param searchUniqueMetrics Unique Metrics (no redirects)
+   * @param searchClickMetrics Click Metrics
+   * @param autoCompleteMetrics AutoComplete Metrics
+   * @param autoCompleteUniqueMetrics Unique AutoComplete metrics
+   * @param autoCompleteClickMetrics AutoComplete Click Metrics
+   */
+  case class MainIndicatorsResults(searchMetrics: RDD[(MainIndicatorKey, Int)],
+                                   searchUniqueMetrics: RDD[(MainIndicatorKey, Int)],
+                                   searchClickMetrics: RDD[(MainIndicatorKey, Int)],
+                                   autoCompleteMetrics: RDD[(MainIndicatorKey, Int)],
+                                   autoCompleteUniqueMetrics : RDD[(MainIndicatorKey, Int)],
+                                   autoCompleteClickMetrics: RDD[(MainIndicatorKey, Int)])
 
 }

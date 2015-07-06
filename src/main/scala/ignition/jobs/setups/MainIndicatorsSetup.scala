@@ -3,7 +3,7 @@ package ignition.jobs.setups
 import java.util.concurrent.Executors
 
 import ignition.core.jobs.CoreJobRunner.RunnerContext
-import ignition.jobs._
+import ignition.jobs.{MainIndicators, _}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent._
@@ -20,7 +20,7 @@ object MainIndicatorsSetup extends SearchETL {
     val sc = runnerContext.sparkContext
     val config = runnerContext.config
 
-    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(1).withTimeAtStartOfDay())
+    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(6).withTimeAtStartOfDay())
     val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.withTime(23, 59, 59, 999))
 
     val timeoutSaveOperation: FiniteDuration = 30 minutes
@@ -42,7 +42,6 @@ object MainIndicatorsSetup extends SearchETL {
           i = i + 1
         }
       }
-
   }
 
 //    saveToDashBoard.onComplete {
