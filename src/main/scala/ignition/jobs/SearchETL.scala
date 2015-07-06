@@ -1,12 +1,12 @@
 package ignition.jobs
 
-import ignition.chaordic.pojo.Parsers.{SearchLogParser, SearchClickLogParser, TransactionParser}
-import ignition.chaordic.pojo.{SearchLog, SearchClickLog, Transaction}
+import ignition.chaordic.pojo.Parsers.{SearchClickLogParser, SearchLogParser, TransactionParser}
+import ignition.chaordic.pojo.{SearchClickLog, SearchLog, Transaction}
 import ignition.chaordic.utils.ChaordicPathDateExtractor._
 import ignition.chaordic.{Chaordic, ParsingReporter}
 import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.jobs.utils.DashboardAPI
-import ignition.jobs.utils.DashboardAPI.{DashPoint, ResultPoint}
+import ignition.jobs.utils.DashboardAPI.DashPoint
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.{DateTime, Interval}
