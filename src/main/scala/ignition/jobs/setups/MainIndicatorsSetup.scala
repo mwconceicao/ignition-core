@@ -4,6 +4,7 @@ import java.util.concurrent.Executors
 
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.jobs.MainIndicators.MainIndicatorKey
+import ignition.jobs.utils.DashboardAPI.FeaturedResultPoint
 import ignition.jobs.{MainIndicators, _}
 import org.apache.spark.rdd.RDD
 import org.slf4j.LoggerFactory
@@ -40,7 +41,7 @@ object MainIndicatorsSetup extends SearchETL {
 
     val results = MainIndicators.process(searchLogs, autoCompleteLogs, clickLogs)
 
-    def collectAndMap(rdd: RDD[(MainIndicatorKey, Int)]) =
+    def collectAndMap(rdd: RDD[(MainIndicatorKey, Int)]): Seq[FeaturedResultPoint] =
       rdd.collect().map {
         case (key, value) => key.toFeaturedResultPoint(value)
       }.toSeq
