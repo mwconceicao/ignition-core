@@ -13,11 +13,13 @@ ideaExcludeFolders += ".idea_modules"
 // Because we can't run two spark contexts on same VM
 parallelExecution in Test := false
 
-libraryDependencies += ("org.apache.spark" %% "spark-core" % "1.3.0" % "provided").exclude("org.apache.hadoop", "hadoop-client")
+libraryDependencies += ("org.apache.spark" %% "spark-core" % "1.3.0" % "provided")
+  .exclude("org.apache.hadoop", "hadoop-client")
+  .exclude("org.slf4j", "slf4j-log4j12")
 
 libraryDependencies += ("org.apache.hadoop" % "hadoop-client" % "2.0.0-cdh4.7.1" % "provided")
 
-libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.1.3"
+libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.2.4"
 
 libraryDependencies += "org.scalaj" %% "scalaj-http" % "0.3.16"
 
