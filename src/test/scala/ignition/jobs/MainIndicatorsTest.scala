@@ -2,6 +2,7 @@ package ignition.jobs
 
 import ignition.chaordic.pojo.{SearchClickLog, SearchEvent, SearchLog}
 import ignition.core.testsupport.spark.SharedSparkContext
+import ignition.core.utils.BetterTrace
 import ignition.jobs.MainIndicators.MainIndicatorKey
 import org.joda.time.DateTime
 import org.scalacheck.Gen
@@ -10,7 +11,7 @@ import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalautils.TolerantNumerics
 
 
-class MainIndicatorsTest extends FlatSpec with SearchGenerators with ShouldMatchers with GeneratorDrivenPropertyChecks with SharedSparkContext {
+class MainIndicatorsTest extends FlatSpec with SearchGenerators with ShouldMatchers with BetterTrace with GeneratorDrivenPropertyChecks with SharedSparkContext {
 
   implicit override val generatorDrivenConfig = PropertyCheckConfig(workers = 4)
   implicit val doubleEquality = TolerantNumerics.tolerantDoubleEquality(0.1)
@@ -98,12 +99,14 @@ class MainIndicatorsTest extends FlatSpec with SearchGenerators with ShouldMatch
     } yield Map("searchId" -> str, "ip" -> ip)
 
     forAll(Gen.listOfN(10, searchLogGenerator(gQuery = Gen.oneOf(Gen.alphaStr, Gen.const("pingdom")), gInfo = gInfo))) {
-      searchEvents: List[SearchLog] => {
-        MainIndicators.getValidSearchLogs(sc.parallelize(searchEvents)).foreach {
-          searchEvent =>
-            searchEvent.page should be(1)
-            searchEvent.query should not be("pingdom")
-            searchEvent.ip should not be "107.170.51.250"
+      (searchEvents: List[SearchLog]) => {
+        withBetterTrace {
+          MainIndicators.getValidSearchLogs(sc.parallelize(searchEvents)).collect().toSeq.foreach {
+            searchEvent =>
+              searchEvent.page should be(1)
+              searchEvent.query should not be "pingdom"
+              searchEvent.ip should not be "107.170.51.250"
+          }
         }
       }
     }
@@ -117,8 +120,8 @@ class MainIndicatorsTest extends FlatSpec with SearchGenerators with ShouldMatch
     } yield Map("searchId" -> str, "ip" -> ip)
 
     forAll(Gen.listOfN(10, searchClickLogGenerator(gQuery = Gen.oneOf(Gen.alphaStr, Gen.const("pingdom")), gInfo = gInfo))) {
-      searchEvents: List[SearchClickLog] => {
-        MainIndicators.getValidClickLogs(sc.parallelize(searchEvents)).foreach {
+      (searchEvents: List[SearchClickLog]) => {
+        MainIndicators.getValidClickLogs(sc.parallelize(searchEvents)).collect().toSeq.foreach {
           searchEvent =>
             searchEvent.query should not be("pingdom")
             searchEvent.ip should not be "107.170.51.250"
