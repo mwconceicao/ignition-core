@@ -1,6 +1,7 @@
 package ignition.core.utils
 
 import scala.concurrent.{ExecutionContext, Future, Promise, blocking, future}
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 object FutureUtils {
@@ -22,11 +23,10 @@ object FutureUtils {
      * instead
      *
      * future.map(i=>1).recover(case _: Exception => 0)
-     * future.transform(=> 1, => 0)
      *
      */
     def asTry()(implicit ec: ExecutionContext) : Future[Try[V]] = {
-      future.map(v => Success(v)).recover { case e: Exception => Failure(e) }
+      future.map(v => Success(v)).recover { case NonFatal(e) => Failure(e) }
     }
   }
 
