@@ -7,7 +7,7 @@ import ignition.jobs.setups.SitemapXMLSetup._
 import ignition.jobs.utils.SearchApi
 import ignition.jobs.{SearchETL, TransactionETL}
 import org.apache.spark.storage.StorageLevel
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent._
 import scala.concurrent.duration._
@@ -26,7 +26,7 @@ import scala.util.{Failure, Success}
 
 object TransactionETLSetup extends SearchETL {
 
-  override lazy val logger = LoggerFactory.getLogger("ignition.TransactionETLSetup")
+  lazy val logger: Logger = LoggerFactory.getLogger("ignition.TransactionETLSetup")
 
   implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
@@ -35,7 +35,7 @@ object TransactionETLSetup extends SearchETL {
     val config = runnerContext.config
 
     val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(1).withTimeAtStartOfDay())
-    val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.withTime(23, 59, 59, 999))
+    val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.minusDays(1).withTime(23, 59, 59, 999))
 
     val timeoutSaveOperation: FiniteDuration = 30 minutes
 

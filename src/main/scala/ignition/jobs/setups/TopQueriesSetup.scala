@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory
 
 object TopQueriesSetup extends SearchETL  {
 
-  override lazy val logger = LoggerFactory.getLogger("ignition.TopQueriesSetup")
+  lazy val logger = LoggerFactory.getLogger("ignition.TopQueriesSetup")
 
   def run(runnerContext: RunnerContext): Unit = {
     val sc = runnerContext.sparkContext

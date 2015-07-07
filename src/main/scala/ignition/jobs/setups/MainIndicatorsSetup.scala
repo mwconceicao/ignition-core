@@ -12,7 +12,7 @@ import scala.language.postfixOps
 
 object MainIndicatorsSetup extends SearchETL {
 
-  override lazy val logger = LoggerFactory.getLogger("ignition.TransactionETLSetup")
+  lazy val logger = LoggerFactory.getLogger("ignition.TransactionETLSetup")
 
   implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
