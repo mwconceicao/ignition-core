@@ -45,6 +45,7 @@ object TopQueriesJob extends SearchETL {
   def fixAutocompleteDuplication(searchLogByKey: RDD[(SearchKey, Iterable[SearchLog])]): RDD[(SearchKey, Iterable[SearchLog])] =
     searchLogByKey.map {
       case (key @ SearchKey(_, "autocomplete", _), events) =>
+        // should materialize?
         (key, events.toSeq.sortBy(_.query.length).reverse.lastOption.toSeq)
       case other => other
     }
@@ -53,7 +54,6 @@ object TopQueriesJob extends SearchETL {
     searchLogByKey.flatMap {
       case (searchKey, events) =>
         events
-          .filter(_.isValidFeature)
           .filter(event => event.normalizedQuery.nonEmpty && event.page == 1)
           .map(event => (event.queryKey, event))
     }.groupByKey()

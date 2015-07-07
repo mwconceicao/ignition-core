@@ -2,6 +2,7 @@ package ignition.jobs
 
 import ignition.chaordic.pojo.{SearchClickLog, SearchProductInfo, SearchProduct, SearchLog}
 import ignition.core.testsupport.spark.SharedSparkContext
+import ignition.core.utils.BetterTrace
 import ignition.jobs.TestTags.SlowTest
 import org.joda.time.DateTime
 import org.scalacheck.Gen
@@ -94,46 +95,49 @@ trait SearchGenerators {
   val gFeature = Gen.oneOf("rank-fallback", "redirect", "spelling-fallback", "standard", "autocomplete")
 }
 
-class TopQueriesJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContext with GeneratorDrivenPropertyChecks with SearchGenerators {
+class TopQueriesJobSpec extends FlatSpec with SearchGenerators with ShouldMatchers with SharedSparkContext with GeneratorDrivenPropertyChecks with BetterTrace {
 
   implicit override val generatorDrivenConfig = PropertyCheckConfig(workers = 4)
 
   "TopQueriesJob" should "calculate top queries" taggedAs SlowTest in {
     val queries = Gen.frequency(
-      (20, "banco imobiliário"),
+      (400, "banco imobiliário"),
       (20, "cerveja"),
       (15, "o guia do mochileiro das galáxias"),
-      (10, "blu-ray 3d"),
-      (10, "box livros"),
+      (8, "blu-ray 3d"),
+      (6, "box livros"),
       (5, "o mercado de ações ao seu alcance"),
       (5, "fisica classica"),
       (5, "micro computadores"),
       (5, "emergencias clinicas"),
       (5, "caixa d'água 500 litros")
     )
-    val gSearchLog = Gen.listOfN(500, searchLogGenerator(gQuery = queries))
-    forAll(gSearchLog) { logs =>
-      val rdd = sc.parallelize(logs)
-      val allTopQueries = TopQueriesJob.execute(rdd).collect()
-      allTopQueries.foreach { topQueries =>
-        val topQuery = topQueries.topQueries.sortBy(_.count).reverse.head.query
-        topQuery == "banco imobiliário" || topQuery == "cerveja" || topQuery == "o guia do mochileiro das galáxias"
+    val gSearchLog = Gen.listOfN(100, searchLogGenerator(gApiKey = Gen.const("apikey"), gQuery = queries))
+    val gSearchLog2 = Gen.listOfN(100, searchLogGenerator(gApiKey = Gen.const("apikey2"), gQuery = queries))
+    forAll(gSearchLog, gSearchLog2) { (logs, logs2) =>
+      withBetterTrace {
+        val rdd = sc.parallelize(logs)
+        val allTopQueries = TopQueriesJob.execute(rdd).collect()
+        allTopQueries.foreach { topQueries =>
+          val topQuery = topQueries.topQueries.head.query
+          Set("banco imobiliário", "cerveja", "o guia do mochileiro das galáxias") should contain (topQuery)
+        }
       }
     }
   }
 
   it should "filter invalid events" taggedAs SlowTest in {
-    val invalidQueries = Set("pigdom")
     val invalidIpAddresses = Set("107.170.51.250")
     val invalidBrowser = Map("browser_family" -> "bot") // FIXME this is hardcoded in TopQueriesJob private property
     val invalidIp = Map("ip" -> invalidIpAddresses.head) // FIXME this is hardcoded in TopQueriesJob private property
     val gInvalidInfo = gInfo.flatMap(info => Gen.oneOf(invalidBrowser, invalidIp).map(info ++ _) )
 
-    // FIXME this is hardcoded in TopQueriesJob private property
-    val gSearchLog = searchLogGenerator(gInfo = Gen.oneOf(gInfo, gInvalidInfo), gQuery = Gen.oneOf(Gen.alphaStr, Gen.const(invalidQueries.head)))
-      .suchThat(event => !event.valid(invalidQueries, invalidIpAddresses))
+    val invalidInfoSearchLog = searchLogGenerator(gInfo = gInvalidInfo)
+    val invalidQuerySearchLog = searchLogGenerator(gQuery = Gen.const("pigdom"))
 
-    forAll(Gen.nonEmptyListOf(gSearchLog)) { logs =>
+    val invalidSearchLog = Gen.oneOf(invalidInfoSearchLog, invalidQuerySearchLog)
+
+    forAll(Gen.nonEmptyListOf(invalidSearchLog)) { logs =>
       val rdd = sc.parallelize(logs)
       val topQueries = TopQueriesJob.execute(rdd).collect()
       topQueries.isEmpty shouldBe true
