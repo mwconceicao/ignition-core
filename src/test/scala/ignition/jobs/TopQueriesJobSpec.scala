@@ -1,6 +1,6 @@
 package ignition.jobs
 
-import ignition.chaordic.pojo.{SearchProductInfo, SearchProduct, SearchLog}
+import ignition.chaordic.pojo.{SearchClickLog, SearchProductInfo, SearchProduct, SearchLog}
 import ignition.core.testsupport.spark.SharedSparkContext
 import ignition.jobs.TestTags.SlowTest
 import org.joda.time.DateTime
@@ -9,8 +9,7 @@ import org.scalatest._
 import ignition.chaordic.pojo.ChaordicGenerators._
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 
-class TopQueriesJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContext with GeneratorDrivenPropertyChecks {
-
+trait SearchGenerators {
   def searchProductGenerator(gId: Gen[String] = Gen.alphaStr,
                              gPurchaseWeight: Gen[Double] = Gen.chooseNum(0, 5),
                              gScore: Gen[Double] = Gen.chooseNum(-1000, 1000),
@@ -23,6 +22,22 @@ class TopQueriesJobSpec extends FlatSpec with ShouldMatchers with SharedSparkCon
     } yield {
       SearchProduct(id = id, info = SearchProductInfo(purchase_weight = purchaseWeight, score = score, view_weight = viewWeight))
     }
+  }
+
+  def searchClickLogGenerator(gApiKey: Gen[String] = gApiKey,
+                              gDate: Gen[DateTime] = dateGenerator(),
+                              gFeature: Gen[String] = gFeature,
+                              gQuery: Gen[String] = Gen.alphaStr,
+                              gUserId: Gen[String] = Gen.alphaStr,
+                              gInfo: Gen[Map[String, String]] = gInfo): Gen[SearchClickLog] = {
+    for {
+      apiKey <- gApiKey
+      date <- gDate
+      query <- gQuery
+      feature <- gFeature
+      userId <- gUserId
+      info <- gInfo
+    } yield SearchClickLog(apiKey, userId, date, query, feature, info)
   }
 
   def searchLogGenerator(gApiKey: Gen[String] = gApiKey,
@@ -77,6 +92,9 @@ class TopQueriesJobSpec extends FlatSpec with ShouldMatchers with SharedSparkCon
     "marcyn", "marisa", "mmm-v5", "mobly-v5", "peixeurbano", "ricardoeletro", "saraiva-v5", "staples", "telhanorte", "vivara")
 
   val gFeature = Gen.oneOf("rank-fallback", "redirect", "spelling-fallback", "standard", "autocomplete")
+}
+
+class TopQueriesJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContext with GeneratorDrivenPropertyChecks with SearchGenerators {
 
   implicit override val generatorDrivenConfig = PropertyCheckConfig(workers = 4)
 
