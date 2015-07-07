@@ -48,7 +48,7 @@ trait SearchGenerators {
                          gFilters: Gen[Option[Map[String, List[String]]]] = Gen.option(Gen.mapOf(gFilter)),
                          gPage: Gen[Int] = Gen.chooseNum(1, 15),
                          gPageSize: Gen[Option[Int]] = Gen.option(Gen.oneOf(10, 25, 50)),
-                         gTotalFound: Gen[Int] = Gen.chooseNum(0, 100),
+                         gTotalFound: Gen[Int] = Gen.chooseNum(1, 100),
                          gQuery: Gen[String] = Gen.alphaStr,
                          gUserId: Gen[String] = Gen.alphaStr,
                          gOrder: Gen[Option[String]] = Gen.option(Gen.alphaStr),
@@ -100,9 +100,9 @@ class TopQueriesJobSpec extends FlatSpec with SearchGenerators with ShouldMatche
   implicit override val generatorDrivenConfig = PropertyCheckConfig(workers = 4)
 
   "TopQueriesJob" should "calculate top queries" taggedAs SlowTest in {
-    val queries = Gen.frequency(
-      (400, "banco imobiliário"),
-      (20, "cerveja"),
+    val queriesWithResult = Gen.frequency(
+      (50, "banco imobiliário"),
+      (50, "cerveja"),
       (15, "o guia do mochileiro das galáxias"),
       (8, "blu-ray 3d"),
       (6, "box livros"),
@@ -112,15 +112,37 @@ class TopQueriesJobSpec extends FlatSpec with SearchGenerators with ShouldMatche
       (5, "emergencias clinicas"),
       (5, "caixa d'água 500 litros")
     )
-    val gSearchLog = Gen.listOfN(100, searchLogGenerator(gApiKey = Gen.const("apikey"), gQuery = queries))
-    val gSearchLog2 = Gen.listOfN(100, searchLogGenerator(gApiKey = Gen.const("apikey2"), gQuery = queries))
-    forAll(gSearchLog, gSearchLog2) { (logs, logs2) =>
+    val topQueriesWithResult = Set("banco imobiliário", "cerveja", "o guia do mochileiro das galáxias")
+
+    val queriesWithoutResult = Gen.frequency(
+      (50, "um lobo instruido"),
+      (50, "normas-regulamentadoras-nr-36"),
+      (15, "banda do mar"),
+      (8, "romans--paul's letter of hope"),
+      (6, "alice in zombieland"),
+      (5, "panic at the disco"),
+      (5, "caneta montblanc"),
+      (5, "tv 32 led"),
+      (5, "tempero de familia"),
+      (5, "o sistema do mundo")
+    )
+    val topQueriesWithoutResult = Set("um lobo instruido", "normas-regulamentadoras-nr-36", "banda do mar")
+
+    val gSearchLogWithResults = Gen.listOfN(100, searchLogGenerator(gApiKey = Gen.const("apiKey-with-results"),
+      gQuery = queriesWithResult, gTotalFound = Gen.chooseNum(5, 20)))
+    val gSearchLogWithoutResults = Gen.listOfN(100, searchLogGenerator(gApiKey = Gen.const("apiKey-without-results"),
+      gQuery = queriesWithoutResult, gTotalFound = Gen.const(0)))
+
+    forAll(gSearchLogWithResults, gSearchLogWithoutResults) { (result, without) =>
       withBetterTrace {
-        val rdd = sc.parallelize(logs)
+        val rdd = sc.parallelize(result ++ without)
         val allTopQueries = TopQueriesJob.execute(rdd).collect()
         allTopQueries.foreach { topQueries =>
           val topQuery = topQueries.topQueries.head.query
-          Set("banco imobiliário", "cerveja", "o guia do mochileiro das galáxias") should contain (topQuery)
+          if (topQueries.hasResult)
+            topQueriesWithResult should contain (topQuery)
+          else
+            topQueriesWithoutResult should contain (topQuery)
         }
       }
     }

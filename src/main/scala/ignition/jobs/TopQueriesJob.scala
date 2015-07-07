@@ -60,8 +60,8 @@ object TopQueriesJob extends SearchETL {
 
   def calculateTopQueries(logsByQuery: RDD[(QueryKey, Iterable[SearchLog])]): RDD[TopQueries] = {
     val rawTopQueries = logsByQuery.map {
-      case (QueryKey(apiKey, day, query, hasResult), hashes) =>
-        ((apiKey, day, hasResult), QueryCount(query, hashes.size))
+      case (QueryKey(apiKey, day, query, hasResult), events) =>
+        ((apiKey, day, hasResult), QueryCount(query, events.size))
     }.groupByKey()
 
     rawTopQueries.map {
