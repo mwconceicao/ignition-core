@@ -8,4 +8,4 @@ mkdir -p $RESULTS_DIR
 export LANG=C
 export LC_ALL=C
 
-nohup $IGNITION_HOME/scripts/job_runner.py transactionetl-generation $RESULTS_DIR >& $LOG_DIR/transactionetl_job_runner.log &
+nohup $IGNITION_HOME/scripts/job_runner.py transaction-etl $RESULTS_DIR >& $LOG_DIR/transactionetl_job_runner.log &
