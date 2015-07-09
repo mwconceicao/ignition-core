@@ -2,13 +2,13 @@ package ignition.jobs.utils
 
 import akka.actor.ActorSystem
 import ignition.jobs.Configuration
-import ignition.jobs.utils.DashboardAPI.{DashPoint, FeaturedResultPoint, ResultPoint}
+import ignition.jobs.utils.DashboardAPI.{FeaturedResultPoint, ResultPoint}
 import org.joda.time.Interval
 import spray.client.pipelining.{SendReceive, _}
-import spray.http._
 import spray.http.ContentTypes.`application/json`
+import spray.http._
 import spray.httpx.SprayJsonSupport._
-import spray.json.{JsValue, RootJsonFormat, DefaultJsonProtocol}
+import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 
 import scala.concurrent.Future
 import scala.language.{implicitConversions, postfixOps}
@@ -19,7 +19,31 @@ object DashboardAPIProtocol extends DefaultJsonProtocol {
   implicit val resultPointWithFeatureFormat = jsonFormat4(FeaturedResultPoint)
 }
 
-object DashboardAPI {
+
+/**
+ * Dashboard don't concur with Platform apikeys. So we convert them YEY.
+ */
+trait DashboardApikeyConversion {
+
+  val clientMapping = Map(
+    "siciliano-v5" -> "siciliano",
+    "megamamute-v5" -> "megamamute",
+    "walmart-marketplace" -> "walmart",
+    "saraiva-v5" -> "saraiva",
+    "imaginarium-v5" -> "imaginarium",
+    "mmm-v5" -> "mmm",
+    "centauro-v5" -> "centauro",
+    "cabeleza-v5" -> "cabeleza",
+    "vivara-v5" -> "vivara",
+    "mobly-v5" -> "mobly",
+    "hering-v5" -> "hering")
+
+  def getDashboardClient(original: String) =
+    clientMapping.getOrElse(original, original)
+
+}
+
+object DashboardAPI extends DashboardApikeyConversion{
 
   import DashboardAPIProtocol._
 
@@ -58,16 +82,25 @@ object DashboardAPI {
    *
    * @param product Product identification on dashboard
    * @param kpi KPI to send metric
-   * @param resultPoint Metric to send
+   * @param dashPoint Metric to send
    *
    * @return a future with the result of this operation.
    */
-  def dailyFact(product: String, kpi: String, resultPoint: DashPoint): Future[Unit] = {
-    dashboardPipeline(Post(s"$baseHref/$product/$kpi", resultPoint)).flatMap { response =>
+  def dailyFact(product: String, kpi: String, dashPoint: DashPoint): Future[Unit] = {
+
+    // FIXME: Make Platform and DashboardAPI concur.
+    val fixedDashPoint: DashPoint = dashPoint match {
+      case ResultPoint(client, day, value) =>
+        ResultPoint(getDashboardClient(client), day, value)
+      case FeaturedResultPoint(client, day, value, feature) =>
+        FeaturedResultPoint(getDashboardClient(client), day, value, feature)
+    }
+
+    dashboardPipeline(Post(s"$baseHref/$product/$kpi", fixedDashPoint)).flatMap { response =>
       if (response.status.isSuccess)
         Future.successful()
       else
-        Future.failed(new RuntimeException(s"Fail to save product = $product, kpi = $kpi, resultPoint = $resultPoint"))
+        Future.failed(new RuntimeException(s"Fail to save product = $product, kpi = $kpi, resultPoint = $fixedDashPoint"))
     }
   }
 
