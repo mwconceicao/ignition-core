@@ -46,14 +46,14 @@ object MainIndicatorsSetup extends SearchETL {
         case (key, value) => key.toFeaturedResultPoint(value)
       }.toSeq
 
-    val f1: Future[Unit] = saveMetrics("search_count", start, end, collectAndMap(results.searchMetrics))
-    val f2 = saveMetrics("search_unique", start, end, collectAndMap(results.searchUniqueMetrics))
+    val f1: Future[Unit] = saveMetrics("searches", start, end, collectAndMap(results.searchMetrics))
+    val f2 = saveMetrics("unique_searches", start, end, collectAndMap(results.searchUniqueMetrics))
     val f3 = saveMetrics("search_clicks", start, end, collectAndMap(results.searchClickMetrics))
-    val f4 = saveMetrics("search_clicks_unique", start, end, collectAndMap(results.searchClickUniqueMetrics))
+    val f4 = saveMetrics("unique_search_clicks", start, end, collectAndMap(results.searchClickUniqueMetrics))
     val f5 = saveMetrics("autocomplete_count", start, end, collectAndMap(results.autoCompleteMetrics))
     val f6 = saveMetrics("autocomplete_unique", start, end, collectAndMap(results.autoCompleteUniqueMetrics))
     val f7 = saveMetrics("autocomplete_clicks", start, end, collectAndMap(results.autoCompleteClickMetrics))
-    val f8 = saveMetrics("autocomplete_clicks_unique", start, end, collectAndMap(results.autoCompleteUniqueClickMetrics))
+    val f8 = saveMetrics("unique_autocomplete_clicks", start, end, collectAndMap(results.autoCompleteUniqueClickMetrics))
 
     val saveToDashBoard = Future.sequence(List(f1,f2,f3,f4,f5,f6,f7,f8))
 
