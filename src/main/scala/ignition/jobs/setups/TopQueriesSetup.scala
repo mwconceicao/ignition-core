@@ -22,7 +22,10 @@ object TopQueriesSetup extends SearchETL  {
     TopQueriesJob.execute(parsedSearchLogs)
       .repartition(numPartitions = 1)
       .map(transformToJsonString)
-      .saveAsTextFile(s"s3://chaordic-search-ignition-history/top-queries/${config.tag}")
+      .saveAsTextFile(s"s3n://chaordic-search-ignition-history/top-queries/${config.tag}")
+
+    // TODO: use this:
+    // .saveAsTextFile(s"s3n://mail-ignition/${runnerConfig.setupName}/${runnerConfig.user}/userContexts/${runnerConfig.tag}", classOf[GzipCodec])
 
     logger.info(s"TopQueriesJob done.")
   }

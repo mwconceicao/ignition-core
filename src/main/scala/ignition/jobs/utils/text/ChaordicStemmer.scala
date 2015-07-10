@@ -19,7 +19,7 @@ trait ChaordicStemmer extends NormalizeSupport {
     }
 
   def stemToken(token: String, singularizationRules: Seq[String]): String = {
-    if ((pluralExceptions contains token) || !token.endsWith("s")) token
+    if ((pluralExceptions contains token) || !token.endsWith("s") || singularizationRules.isEmpty) token
     else stemToken(stemTokenByRule(token, singularizationRules.head), singularizationRules.tail)
   }
 

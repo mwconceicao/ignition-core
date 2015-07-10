@@ -19,6 +19,10 @@ class ChaordicStemmerSpec extends FlatSpec with Matchers {
     ChaordicStemmer.stem(Seq("carnais", "mais")) should be (Seq("carnal", "mais"))
   }
 
+  it should "not stem words that can't be stemed" in {
+    ChaordicStemmer.stem(Seq("jog")) should be (Seq("jog"))
+  }
+
   it should "stem simple plural words without special characters" in {
     ChaordicStemmer.stem(Seq("caes", "paes")) should be (Seq("cao", "pao"))
   }

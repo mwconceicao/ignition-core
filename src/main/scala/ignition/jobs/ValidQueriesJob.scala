@@ -19,13 +19,13 @@ import org.joda.time.DateTime
  *
  */
 
-object ValidQueries {
+object ValidQueriesJob {
 
   import ignition.core.utils.DateUtils._
   import ignition.jobs.utils.SearchEventValidations.SearchEventValidations
 
-  val invalidQueries = Set[String]().empty
-  val invalidIPs = Set[String]().empty
+  val invalidQueries = Set("pingdom")
+  val invalidIPs = Set("107.170.51.250")
 
   val lastDaysToConsider = DateTime.now.minusDays(365)
 
@@ -54,7 +54,7 @@ object ValidQueries {
 
   implicit class SearchLogsImprovements(searchLog: SearchLog) {
     def hasFilters =
-      searchLog.filters.getOrElse(Map.empty()).nonEmpty
+      searchLog.filters.getOrElse(Map.empty).nonEmpty
   }
 
   /**
