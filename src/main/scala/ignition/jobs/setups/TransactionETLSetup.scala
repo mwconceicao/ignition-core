@@ -47,7 +47,7 @@ object TransactionETLSetup extends SearchETL {
     val transactions = parseTransactions(config.setupName, sc, start, end, allClients).persist(StorageLevel.MEMORY_AND_DISK)
 
     logger.info(s"Starting ETLTransaction")
-    val results = TransactionETL.process(sc, transactions)
+    val results = TransactionETL.process(transactions)
 
     val saveSalesSearch = saveMetrics("sales_search", start, end, results.salesSearch.collect().toSeq)
     val saveSalesOverall = saveMetrics("sales_overall", start, end, results.salesOverall.collect().toSeq)
