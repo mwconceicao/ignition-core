@@ -5,7 +5,7 @@ import ignition.chaordic.pojo.{SearchClickLog, SearchLog, Transaction}
 import ignition.chaordic.utils.ChaordicPathDateExtractor._
 import ignition.chaordic.Chaordic
 import ignition.core.jobs.utils.SparkContextUtils._
-import ignition.jobs.utils.DashboardAPI
+import ignition.jobs.utils.{EntitiesLayer, DashboardAPI}
 import ignition.jobs.utils.DashboardAPI.DashPoint
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -36,27 +36,24 @@ trait SearchETL {
     }
   }
 
-  def parseAutoCompleteLogs(context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] =
-    SearchLogParser.parseSearchLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/autocompletelog/*/*.gz",
-      startDate = Option(start), endDate = Option(end)))
+  def parseAutoCompleteLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] =
+    EntitiesLayer.parseSearchLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/autocompletelog/*/*.gz",
+      startDate = Option(start), endDate = Option(end)), setupName)
 
-  def parseSearchLogs(context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] =
-    SearchLogParser.parseSearchLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*/*.gz",
-      startDate = Option(start), endDate = Option(end)))
+  def parseSearchLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] =
+    EntitiesLayer.parseSearchLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*/*.gz",
+      startDate = Option(start), endDate = Option(end)), setupName)
 
-  def parseClickLogs(context: SparkContext, start: DateTime, end: DateTime): RDD[SearchClickLog] =
-    SearchClickLogParser.parseSearchClickLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*/*.gz",
-      startDate = Option(start), endDate = Option(end)))
+  def parseClickLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchClickLog] =
+    EntitiesLayer.parseSearchClickLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*/*.gz",
+      startDate = Option(start), endDate = Option(end)), setupName)
 
-  def parseTransactions(context: SparkContext, start: DateTime, end: DateTime, clients: Set[String]): RDD[Transaction] = {
+  def parseTransactions(setupName: String, context: SparkContext, start: DateTime, end: DateTime, clients: Set[String]): RDD[Transaction] = {
     require(start.isBefore(end), s"Start = $start must be before end = $end")
     val paths = for { date <- dateRangeByDay(start, end) } yield {
       s"s3n://platform-dumps-virginia/buyOrders/${date.toString("yyyy-MM-dd")}/*.gz"
     }
-    context.getTextFiles(paths)
-      .map(json => Chaordic.parseWith(json, parser = new TransactionParser))
-      .collect { case Success(parsed) => parsed }
-      .filter(transaction => clients.contains(transaction.apiKey))
+    EntitiesLayer.parseTransactions(context.getTextFiles(paths), setupName)
   }
 
   def dateRangeByDay(start: DateTime, end: DateTime): Seq[DateTime] = {

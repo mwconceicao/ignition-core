@@ -4,8 +4,11 @@ import ignition.chaordic.pojo.{SearchEvent, SearchClickLog, SearchLog}
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import ignition.jobs.utils.text.{Tokenizer, ChaordicStemmer}
+import ignition.jobs.utils.SearchEventValidations.SearchEventValidations
 
 object ValidQueries {
+
+  import ignition.core.utils.DateUtils._
 
   val invalidQueries = Set[String]().empty
   val invalidIPs = Set[String]().empty

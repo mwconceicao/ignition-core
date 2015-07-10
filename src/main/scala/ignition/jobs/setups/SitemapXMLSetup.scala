@@ -10,7 +10,7 @@ import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.core.utils.DateUtils._
 import ignition.core.utils.S3Client
 import ignition.jobs._
-import ignition.jobs.utils.SearchApi
+import ignition.jobs.utils.{EntitiesLayer, SearchApi}
 import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.rdd.RDD
@@ -36,6 +36,7 @@ object SitemapXMLSetup extends ExecutionRetry {
     val sc = runnerContext.sparkContext
     val config = runnerContext.config
     val now = runnerContext.config.date
+    val setupName = config.setupName
 
     val productionUser = "root"
     val jobOutputBucket = "chaordic-search-ignition-history"
@@ -65,14 +66,16 @@ object SitemapXMLSetup extends ExecutionRetry {
 
     logger.info(s"Do we need search logs? $willNeedSearch")
     val parsedClickLogs = if (willNeedSearch)
-      SearchClickLogParser.parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
-        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist(StorageLevel.MEMORY_AND_DISK)
+      EntitiesLayer.parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
+        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay())), setupName)
+        .persist(StorageLevel.MEMORY_AND_DISK)
     else
       sc.emptyRDD[SearchClickLog]
 
     val parsedSearchLogs = if (willNeedSearch)
-      SearchLogParser.parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
-        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist(StorageLevel.MEMORY_AND_DISK)
+      EntitiesLayer.parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
+        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay())), setupName)
+        .persist(StorageLevel.MEMORY_AND_DISK)
     else
       sc.emptyRDD[SearchLog]
 

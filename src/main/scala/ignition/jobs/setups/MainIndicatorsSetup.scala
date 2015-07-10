@@ -33,11 +33,11 @@ object MainIndicatorsSetup extends SearchETL {
     logger.info(s"Starting MainIndicatorsETL for start=$start, end=$end")
 
     logger.info(s"Parsing Search logs...")
-    val searchLogs = parseSearchLogs(sc, start, end).persist()
+    val searchLogs = parseSearchLogs(config.setupName, sc, start, end).persist()
     logger.info(s"Parsing AutoComplete logs...")
-    val autoCompleteLogs = parseAutoCompleteLogs(sc, start, end).persist()
+    val autoCompleteLogs = parseAutoCompleteLogs(config.setupName, sc, start, end).persist()
     logger.info(s"Parsing Click logs...")
-    val clickLogs = parseClickLogs(sc, start, end).persist()
+    val clickLogs = parseClickLogs(config.setupName, sc, start, end).persist()
 
     val results = MainIndicators.process(searchLogs, autoCompleteLogs, clickLogs)
 

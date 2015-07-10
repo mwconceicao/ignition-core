@@ -1,10 +1,16 @@
 package ignition.jobs
 
 import ignition.chaordic.pojo._
-import ignition.chaordic.utils.HtmlUtils
 import org.apache.spark.rdd.RDD
 
 object TopQueriesJob extends SearchETL {
+
+  import ignition.jobs.utils.SearchEventValidations.SearchEventValidations
+
+  case class QueryCount(query: String, count: Long)
+  case class TopQueries(apiKey: String, day: String, hasResult: Boolean, topQueries: Seq[QueryCount])
+  case class SearchKey(apiKey: String, feature: String, searchId: String)
+  case class QueryKey(apiKey: String, day: String, query: String, hasResult: Boolean)
 
   private val invalidQueries = Set("pigdom")
   private val invalidIpAddresses = Set("107.170.51.250")
@@ -24,7 +30,7 @@ object TopQueriesJob extends SearchETL {
       feature = searchLog.realFeature,
       searchId = searchLog.searchId)
 
-    def normalizedQuery: String = HtmlUtils.stripHtml(searchLog.query).toLowerCase
+    def normalizedQuery: String = searchLog.query.toLowerCase.replaceAll("\\<.*?>", "").replaceAll("&lt;.*?&gt;", "")
     def realFeature: String = if (validFeatures.contains(searchLog.feature)) searchLog.feature else "search"
     def hasResult: Boolean = searchLog.totalFound > 0
     def isValidFeature: Boolean = if (searchLog.realFeature == "autocomplete" && !searchLog.hasResult) false else true

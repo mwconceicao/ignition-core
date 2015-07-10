@@ -44,7 +44,7 @@ object TransactionETLSetup extends SearchETL {
     val allClients = executeRetrying(SearchApi.getClients())
     logger.info(s"With clients: $allClients")
 
-    val transactions = parseTransactions(sc, start, end, allClients).persist(StorageLevel.MEMORY_AND_DISK)
+    val transactions = parseTransactions(config.setupName, sc, start, end, allClients).persist(StorageLevel.MEMORY_AND_DISK)
 
     logger.info(s"Starting ETLTransaction")
     val results = TransactionETL.process(sc, transactions)
@@ -54,8 +54,11 @@ object TransactionETLSetup extends SearchETL {
     val saveToDashBoard = saveSalesSearch.zip(saveSalesOverall)
 
     saveToDashBoard.onComplete {
-      case Success(_) => logger.info("TransactionETL - GREAT SUCCESS")
-      case Failure(exception) => logger.error("Error on saving metrics to dashboard API", exception)
+      case Success(_) =>
+        logger.info("TransactionETL - GREAT SUCCESS")
+      case Failure(exception) =>
+        logger.error("Error on saving metrics to dashboard API", exception)
+        throw exception
     }
 
     try {
@@ -63,6 +66,7 @@ object TransactionETLSetup extends SearchETL {
     } catch {
       case NonFatal(exception) =>
         logger.error("Error on saving metrics to dashboard API", exception)
+        throw exception
     }
   }
 

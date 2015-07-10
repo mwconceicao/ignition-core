@@ -1,8 +1,8 @@
 package ignition.jobs.setups
 
-import ignition.chaordic.pojo.TopQueries
 import ignition.chaordic.utils.Json
 import ignition.core.jobs.CoreJobRunner.RunnerContext
+import ignition.jobs.TopQueriesJob.TopQueries
 import ignition.jobs.{SearchETL, TopQueriesJob}
 import org.slf4j.LoggerFactory
 
@@ -18,7 +18,7 @@ object TopQueriesSetup extends SearchETL  {
 
     logger.info(s"Starting TopQueriesJob for start = $start, end $now")
 
-    val parsedSearchLogs = parseSearchLogs(sc, start = start, end = now)
+    val parsedSearchLogs = parseSearchLogs(config.setupName, sc, start = start, end = now)
     TopQueriesJob.execute(parsedSearchLogs)
       .repartition(numPartitions = 1)
       .map(transformToJsonString)

@@ -65,6 +65,8 @@ import scala.reflect.ClassTag
 object MainIndicators extends SearchETL {
 
 
+  import ignition.jobs.utils.SearchEventValidations.SearchEventValidations
+
   /** Utilities for Validation **/
   private val invalidQueries = Set("pingdom")
   private val invalidIps = Set("107.170.51.250")
