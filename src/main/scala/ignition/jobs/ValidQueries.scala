@@ -5,6 +5,20 @@ import ignition.jobs.utils.text.{ChaordicStemmer, Tokenizer}
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 
+/**
+ * This Job is of utmost importance. This generate values for the index `valid_queries` that is maintained on our
+ * Elasticsearch. This index is used to generate query recommendations in auto complete and also query suggestions on
+ * the search page.
+ *
+ * It essentially aggregate all queries and clicks of a given apikey/query. This query is normalized so we can aggregate
+ * them. We them filter the query that was most searched and use that as a valid suggestion. Valid Suggestions are
+ * sorted by importance (Clicks/Search/CTR) [TODO: Review logic on simpleui or chaordic_search/__init__.py].
+ *
+ * ValidQueries on the job is always considered valid, and they are set to invalid by search front-backend, i.e., the
+ * valid query becomes invalid when the search given by this suggestion yield no results.
+ *
+ */
+
 object ValidQueries {
 
   val invalidQueries = Set[String]().empty
