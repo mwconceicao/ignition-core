@@ -1,9 +1,9 @@
 package ignition.jobs
 
-import ignition.chaordic.pojo.{SearchEvent, SearchClickLog, SearchLog}
+import ignition.chaordic.pojo.{SearchClickLog, SearchEvent, SearchLog}
+import ignition.jobs.utils.text.{ChaordicStemmer, Tokenizer}
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
-import ignition.jobs.utils.text.{Tokenizer, ChaordicStemmer}
 
 object ValidQueries {
 
@@ -81,36 +81,53 @@ object ValidQueries {
   def normalizeQuery(query: String) =
     query.trim.toLowerCase.removeTyposAtQueryTail()
 
+  /**
+   * Used to reduce valid queries. The key consist of the normalized strings removing all the spaces.
+   * @param query
+   * @return
+   */
   def queryToKey(query: String) =
     ChaordicStemmer.asciiFold(query.split("\\s+")).mkString
 
+  /**
+   * Extract tokens. This function tokenize the words, asciifold, convert to lower and stem words.
+   * @param query
+   * @return
+   */
   def extractTokens(query: String): Seq[String] =
     ChaordicStemmer.stem(ChaordicStemmer.asciiFold(Tokenizer.tokenize(query)).map(_.toLowerCase))
 
-  def joinSearchLogsWithClickLogs(validSearchLogs: RDD[((String, String), SearchLog)],
-                                  validClickLogs: RDD[((String, String), SearchClickLog)]) = {
+  /**
+   * This method removes clicks that does not have an associated SearchLog. This is needed because we are strict with
+   * the type of searchlog, i.e., only standard searches are considered valid. The output is a keyed RDD, with apiKey
+   * and query as keys and the clicklogs as values. The query come from the matched SearchLogs.
+   * @param validSearchLogs
+   * @param validClickLogs
+   */
+  def filterClicksWithoutSearch(validSearchLogs:  RDD[((String, String), SearchLog)],
+                                validClickLogs: RDD[((String, String), SearchClickLog)]): RDD[((String, String), SearchClickLog)] = {
+    validSearchLogs
+      .map { case ((apiKey, searchId), log) => ((apiKey, searchId), log.query) }
+      .distinct()
+      .join(validClickLogs)
+      .filter { case ((apiKey, searchId), (query, log)) => query.nonEmpty }
+      .map { case ((apiKey, searchId), (query, clickLog)) => ((apiKey, query), clickLog) }
+  }
 
-    val filteredClickLogs: RDD[((String, String), SearchClickLog)] =
-      validSearchLogs
-        .map { case ((apiKey, searchId), log) => ((apiKey, searchId), log.query) }
-        .distinct()
-        .join(validClickLogs)
-        .filter { case ((apiKey, searchId), (query, log)) => query.nonEmpty }
-        .map { case ((apiKey, searchId), (query, clickLog)) => ((apiKey, query), clickLog) }
-
-
-    val filteredSearchLogs: RDD[((String, String), SearchLog)] =
-      validSearchLogs
-        .map { case ((apiKey, searchId), log) => ((apiKey, log.query), log) }
-
-    val clicks: RDD[((String, String), Long)] = filteredClickLogs.aggregateByKey(0L)((_, _) => 1, _ + _)
-    val searches: RDD[((String, String), Long)] = filteredSearchLogs.aggregateByKey(0L)((_, _) => 1, _ + _)
-
-    val sumOfResults = filteredSearchLogs.mapValues(_.totalFound.toLong).reduceByKey(_ + _)
-
-    val latestSearchLogs = filteredSearchLogs.reduceByKey((s1, s2) => if (s1.date.isAfter(s2.date)) s1 else s2)
-
-    val validQueries = clicks.join(searches).join(latestSearchLogs).join(sumOfResults).map {
+  /**
+    * This function join clicks, searches, latest search log and the sum of all results given by all the searches inside
+    * it. It generate a RDD of ValidQuery.
+    * @param clicks
+    * @param searches
+    * @param latestSearchLogs
+    * @param sumOfResults
+    * @return
+    */
+  def joinEventsAndGetValidQueries(clicks: RDD[((String, String), Long)],
+                                   searches: RDD[((String, String), Long)],
+                                   latestSearchLogs: RDD[((String, String), SearchLog)],
+                                   sumOfResults: RDD[((String, String), Long)]): RDD[ValidQuery] = {
+    clicks.join(searches).join(latestSearchLogs).join(sumOfResults).map {
       case ((apiKey, query), (((clickCount, searchCount), latestSearchLog), sumResult)) =>
         ValidQuery(apiKey = apiKey,
           query = query,
@@ -123,21 +140,34 @@ object ValidQueries {
           sumResults = sumResult,
           averageResults = sumResult / searchCount)
     }
+  }
 
-    val biggestValidQuery = validQueries
+  /**
+   * Get the Bigger ValidQuery of a given key (apikey, queryToKey(validquery.query)).
+   * @param validQueries
+   * @return A keyed RDD: Key = (Apikey, Tokens of query), Value = Bigger ValidQuery
+   */
+  def getValidQueriesWithMostSearches(validQueries: RDD[ValidQuery]): RDD[((String, Seq[String]), ValidQuery)] =
+    validQueries
       .keyBy(validQuery => (validQuery.apiKey, queryToKey(validQuery.query)))
       .reduceByKey((v1, v2) => if (v1.searches > v2.searches) v1 else v2)
       .map {
-      case ((apiKey, _), validQuery) =>
-        val tokens = extractTokens(validQuery.query)
-        ((apiKey, tokens), validQuery)
-    }
+        case ((apiKey, _), validQuery) =>
+          val tokens = extractTokens(validQuery.query)
+          ((apiKey, tokens), validQuery)
+      }
 
-    biggestValidQuery.groupByKey().map {
+  /**
+   * Given the bigger valid query for a given apikey and tokens output and final output.
+   * @param biggestValidQueries
+   * @return
+   */
+  def generateFinalValidQueries(biggestValidQueries: RDD[((String, Seq[String]), ValidQuery)]) = {
+    biggestValidQueries.groupByKey().map {
       case ((apiKey, tokens), allValidQueries) =>
         val queries = allValidQueries.toSeq
-        val topValidQuery = queries.toSeq.sortBy(_.searches).reverse.head
-        val latestValidQuery = queries.toSeq.sortBy(_.latestSearchLog).reverse.head
+        val topValidQuery = queries.sortBy(_.searches).reverse.head
+        val latestValidQuery = queries.sortBy(_.latestSearchLog).reverse.head
         val totalSearches = queries.map(_.searches).sum
         val totalClicks = queries.map(_.clicks).sum
         val totalResult = queries.map(_.sumResults).sum
@@ -154,7 +184,10 @@ object ValidQueries {
           queries = queries
         )
     }
+  }
 
+  implicit val dateTimeOrdering: Ordering[DateTime] = {
+    Ordering.fromLessThan(_ isBefore _)
   }
 
   def process(searchLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): RDD[ValidQueryFinal] = {
@@ -165,7 +198,31 @@ object ValidQueries {
     val validClickLogs = getValidClickLogs(clickLogs)
       .keyBy(clickLog => (clickLog.apiKey, clickLog.searchId))
 
-    joinSearchLogsWithClickLogs(validSearchLogs, validClickLogs)
+    // Filter and remap key
+    val filteredClickLogs = filterClicksWithoutSearch(validSearchLogs, validClickLogs)
+
+    // remap key
+    val filteredSearchLogs = validSearchLogs
+      .map { case ((apiKey, searchId), log) => ((apiKey, log.query), log) }
+
+    // Count Events
+    val clicks: RDD[((String, String), Long)] = filteredClickLogs.aggregateByKey(0L)((_, _) => 1, _ + _)
+    val searches: RDD[((String, String), Long)] = filteredSearchLogs.aggregateByKey(0L)((_, _) => 1, _ + _)
+
+    // Sum the number of products returned by the all the searches by a given apikey and query.
+    val sumOfResults: RDD[((String, String), Long)] = filteredSearchLogs
+      .mapValues(_.totalFound.toLong).reduceByKey(_ + _)
+
+    // Get the latest by date.
+    val latestSearchLogs: RDD[((String, String), SearchLog)] = filteredSearchLogs
+      .reduceByKey((s1, s2) => if (s1.date.isAfter(s2.date)) s1 else s2)
+
+    // Get Valid Queries
+    val validQueries = joinEventsAndGetValidQueries(clicks, searches, latestSearchLogs, sumOfResults)
+
+    val biggestValidQueries: RDD[((String, Seq[String]), ValidQuery)] = getValidQueriesWithMostSearches(validQueries)
+
+    generateFinalValidQueries(biggestValidQueries)
 
   }
 
