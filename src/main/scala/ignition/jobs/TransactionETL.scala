@@ -50,7 +50,7 @@ object TransactionETL extends SearchETL {
       .map(_.cashByDay)
       .reduceByKey(_ + _)
 
-  def process(sc: SparkContext, transactions: RDD[Transaction]): ETLResult = {
+  def process(transactions: RDD[Transaction]): ETLResult = {
     val salesSearch = calculateSearchSales(transactions).map {
       case ((client: String, day: String), value: Double) => ResultPoint(client, day, value)
     }
