@@ -17,8 +17,8 @@ object ValidQueriesSetup extends SearchETL {
     val config = runnerContext.config
     val now = runnerContext.config.date
 
-    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(1).withTimeAtStartOfDay())
-    val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.minusDays(356).withTime(23, 59, 59, 999))
+    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(356).withTime(23, 59, 59, 999))
+    val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.minusDays(1).withTimeAtStartOfDay())
 
     logger.info(s"Starting ValidQueries for start=$start, end=$end")
 
@@ -47,6 +47,7 @@ object ValidQueriesSetup extends SearchETL {
         "average_results" -> vq.averageResults,
         "latest_search_log_results" -> vq.latestSearchLogResults,
         "latest_search_log" -> vq.latestSearchLog.toString("yyyy-MM-dd HH:mm:ss.SSSSSS"),
+        "latest_search_log_feature" -> vq.latestSearchLogFeature,
         "searchs" -> vq.searches,
         "query" -> vq.query,
         "clicks" -> vq.clicks)),

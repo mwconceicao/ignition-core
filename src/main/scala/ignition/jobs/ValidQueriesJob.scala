@@ -48,7 +48,7 @@ object ValidQueriesJob {
      * @return
      */
     def removeTyposAtQueryTail(): String = {
-      query.replaceAll(substitutionRegex, "")
+      query.replaceAll(substitutionRegex, "").toLowerCase
     }
   }
 
@@ -71,7 +71,7 @@ object ValidQueriesJob {
    */
   def getValidSearchLogs(searchLogs: RDD[SearchLog]) =
     searchLogs
-      .filter(_.feature != "autocomplete")
+      .filter(_.feature == "standard")
       .filter(!_.hasFilters)
       .filter(_.valid(invalidQueries, invalidIPs))
       .filter(_.validDate)
@@ -144,13 +144,13 @@ object ValidQueriesJob {
                                    searches: RDD[((String, String), Long)],
                                    latestSearchLogs: RDD[((String, String), SearchLog)],
                                    sumOfResults: RDD[((String, String), Long)]): RDD[ValidQuery] = {
-    clicks.join(searches).join(latestSearchLogs).join(sumOfResults).map {
-      case ((apiKey, query), (((clickCount, searchCount), latestSearchLog), sumResult)) =>
+    searches.join(latestSearchLogs).join(sumOfResults).leftOuterJoin(clicks).map {
+      case (((apiKey, query), (((searchCount, latestSearchLog), sumResult), clickCount))) =>
         ValidQuery(apiKey = apiKey,
-          query = query,
+          query = normalizeQuery(query),
           searches = searchCount,
-          clicks = clickCount,
-          rawCtr = clickCount.toDouble / searchCount,
+          clicks = clickCount.getOrElse(0L),
+          rawCtr = clickCount.getOrElse(0L).toDouble / searchCount,
           latestSearchLog = latestSearchLog.date,
           latestSearchLogResults = latestSearchLog.totalFound,
           latestSearchLogFeature = latestSearchLog.feature,
@@ -219,8 +219,8 @@ object ValidQueriesJob {
       .map { case ((apiKey, searchId), log) => ((apiKey, log.query), log) }
 
     // Count Events
-    val clicks: RDD[((String, String), Long)] = filteredClickLogs.aggregateByKey(0L)((_, _) => 1, _ + _)
-    val searches: RDD[((String, String), Long)] = filteredSearchLogs.aggregateByKey(0L)((_, _) => 1, _ + _)
+    val clicks: RDD[((String, String), Long)] = filteredClickLogs.mapValues(_ => 1L).reduceByKey(_ + _)
+    val searches: RDD[((String, String), Long)] = filteredSearchLogs.mapValues(_ => 1L).reduceByKey(_ + _)
 
     // Sum the number of products returned by the all the searches by a given apikey and query.
     val sumOfResults: RDD[((String, String), Long)] = filteredSearchLogs

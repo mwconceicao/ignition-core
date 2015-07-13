@@ -1,19 +1,16 @@
 package ignition.jobs
 
-import ignition.chaordic.pojo.Parsers.{SearchClickLogParser, SearchLogParser, TransactionParser}
 import ignition.chaordic.pojo.{SearchClickLog, SearchLog, Transaction}
 import ignition.chaordic.utils.ChaordicPathDateExtractor._
-import ignition.chaordic.Chaordic
 import ignition.core.jobs.utils.SparkContextUtils._
-import ignition.jobs.utils.{EntitiesLayer, DashboardAPI}
 import ignition.jobs.utils.DashboardAPI.DashPoint
+import ignition.jobs.utils.{DashboardAPI, EntitiesLayer}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.joda.time.{Days, DateTime, Interval}
+import org.joda.time.{DateTime, Days, Interval}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Success
 
 trait SearchETL {
 
