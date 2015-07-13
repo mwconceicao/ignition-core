@@ -589,15 +589,15 @@ def sitemap_generation(collect_results_dir, disable_vpc = False, security_group 
              tag=["chaordic:role=gen.sitemap"])
 
 
-def transaction_etl(collect_results_dir, disable_vpc = False, security_group = default_security_group):
+def search_etl(collect_results_dir, disable_vpc = False, security_group = default_security_group):
     run_once(collect_results_dir,
-             "transactionETL",
-             job_name="TransactionETLSetup",
-             cluster_name_prefix="transactionetl-generation",
+             "search_etl",
+             job_name="SearchETLSetup",
+             cluster_name_prefix="search-etl-generation",
              cluster_options=search_generation_cluster_options,
              disable_vpc=disable_vpc,
              security_group=security_group,
-             tag=["chaordic:role=gen.transactionetl"])
+             tag=["chaordic:role=gen.search-etl-generation"])
 
 class ExpireCollection:
     """

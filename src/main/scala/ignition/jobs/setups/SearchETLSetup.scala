@@ -12,9 +12,10 @@ import ignition.jobs.setups.SitemapXMLSetup.logger
 import ignition.jobs.setups.TransactionETLSetup._
 import ignition.jobs.setups.TransactionETLSetup.logger
 import ignition.jobs.utils.DashboardAPI.{DashPoint, ResultPoint}
+import ignition.jobs.utils.Uploader.KpiWithDashPoint
 import ignition.jobs.{TopQueriesJob, MainIndicators, TransactionETL, SearchETL}
 import ignition.jobs.setups.SitemapXMLSetup._
-import ignition.jobs.utils.SearchApi
+import ignition.jobs.utils.{Uploader, SearchApi}
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -36,7 +37,7 @@ object SearchETLSetup extends SearchETL {
     val sc = runnerContext.sparkContext
     val config = runnerContext.config
 
-    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(2).withTimeAtStartOfDay())
+    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(1).withTimeAtStartOfDay())
     val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.minusDays(1).withTime(23, 59, 59, 999))
 
     val timeoutForSaveOperation: FiniteDuration = 30 minutes
@@ -63,30 +64,48 @@ object SearchETLSetup extends SearchETL {
     val clickLogs = parseClickLogs(config.setupName, sc, start, end).persist(StorageLevel.MEMORY_AND_DISK)
 
     val topQueriesResults = TopQueriesJob.execute(searchLogs)
-    val fSaveTopQueries = saveTopQueries(topQueriesResults, s3Prefix)
 
     val transactionsResults = TransactionETL.process(transactions)
     val mainIndicatorsResults = MainIndicators.process(searchLogs, autoCompleteLogs, clickLogs)
 
-    val kpis = sc.union(
-      toKpi("sales_search", start, end, transactionsResults.salesSearch),
+    def toDashPoint(tuple: (MainIndicatorKey, Int)): DashPoint = tuple match {
+      case (indicator, value) => indicator.toResultPoint(value)
+    }
+
+    def toKpi[T <: DashPoint](kpi: String, start: DateTime, end: DateTime, points: RDD[T]): RDD[KpiWithDashPoint] =
+      points.map(point => KpiWithDashPoint(kpi, start, end, point))
+
+    val kpis = sc.union(toKpi("sales_search", start, end, transactionsResults.salesSearch),
       toKpi("sales_search", start, end, transactionsResults.salesSearch),
       toKpi("sales_overall", start, end, transactionsResults.salesSearch),
-      toKpi("searches", start, end, mainIndicatorsResults.searchMetrics),
-      toKpi("unique_searches", start, end, mainIndicatorsResults.searchUniqueMetrics),
-      toKpi("search_clicks", start, end, mainIndicatorsResults.searchClickMetrics),
-      toKpi("unique_search_clicks", start, end, mainIndicatorsResults.searchClickUniqueMetrics),
-      toKpi("autocomplete_count", start, end, mainIndicatorsResults.autoCompleteMetrics),
-      toKpi("autocomplete_unique", start, end, mainIndicatorsResults.autoCompleteUniqueMetrics),
-      toKpi("autocomplete_clicks", start, end, mainIndicatorsResults.autoCompleteClickMetrics),
-      toKpi("unique_autocomplete_clicks", start, end, mainIndicatorsResults.autoCompleteUniqueClickMetrics)
-    ).repartition(numPartitions = 1).persist(StorageLevel.MEMORY_AND_DISK)
+      toKpi("searches", start, end, mainIndicatorsResults.searchMetrics.map(toDashPoint)),
+      toKpi("unique_searches", start, end, mainIndicatorsResults.searchUniqueMetrics.map(toDashPoint)),
+      toKpi("search_clicks", start, end, mainIndicatorsResults.searchClickMetrics.map(toDashPoint)),
+      toKpi("unique_search_clicks", start, end, mainIndicatorsResults.searchClickUniqueMetrics.map(toDashPoint)),
+      toKpi("autocomplete_count", start, end, mainIndicatorsResults.autoCompleteMetrics.map(toDashPoint)),
+      toKpi("autocomplete_unique", start, end, mainIndicatorsResults.autoCompleteUniqueMetrics.map(toDashPoint)),
+      toKpi("autocomplete_clicks", start, end, mainIndicatorsResults.autoCompleteClickMetrics.map(toDashPoint)),
+      toKpi("unique_autocomplete_clicks", start, end, mainIndicatorsResults.autoCompleteUniqueClickMetrics.map(toDashPoint)))
+      .repartition(numPartitions = 1).persist(StorageLevel.MEMORY_AND_DISK)
 
     kpis.saveAsTextFile(s"$s3Prefix/kpis")
+    logger.info(s"Kpis saved to s3, path = $s3Prefix/kpis")
 
-    val fSaveToDashBoard = saveDashPoints(kpis, s3Prefix)
-    val fSaveOperation = fSaveToDashBoard.zip(fSaveTopQueries)
+    topQueriesResults
+      .repartition(numPartitions = 1)
+      .persist(StorageLevel.MEMORY_AND_DISK)
+      .saveAsTextFile(s"$s3Prefix/top-queries")
+    logger.info(s"TopQueries saved to s3, path = $s3Prefix/top-queries")
 
+    val fSaveKpis = Uploader.saveKpisToDashBoard(kpis.collect()).map { _ =>
+      logger.info("Kpis saved to dashboard!")
+    }
+
+    val fSaveTopQueries = Uploader.saveTopQueriesToElasticSearch(topQueriesResults.collect()).map { _ =>
+      logger.info("Top-queries saved to elastic-search!")
+    }
+
+    val fSaveOperation = fSaveKpis.zip(fSaveTopQueries)
     fSaveOperation.onComplete {
       case Success(_) =>
         logger.info("ETL GREAT SUCCESS =]")
@@ -96,24 +115,6 @@ object SearchETLSetup extends SearchETL {
     }
 
     Await.ready(fSaveOperation, timeoutForSaveOperation)
-  }
-
-  case class KpiWithDashPoint(kpi: String, start: DateTime, end: DateTime, point: DashPoint)
-
-  def toKpi[T <: DashPoint](kpi: String, start: DateTime, end: DateTime, points: RDD[T]): RDD[KpiWithDashPoint] =
-    points.map(point => KpiWithDashPoint(kpi, start, end, point))
-
-  def saveTopQueries(topQueries: RDD[TopQueries], s3Prefix: String): Future[Unit] = {
-    val transformed = topQueries.map(TopQueriesSetup.transformToJsonString)
-    transformed.saveAsTextFile(s"$s3Prefix/top-queries", classOf[GzipCodec])
-    Future.successful() // TODO save results to Elastic Search
-  }
-
-  def saveDashPoints(dashPoints: RDD[KpiWithDashPoint], s3Prefix: String): Future[Unit] = {
-    val requests = dashPoints.keyBy(data => (data.kpi, data.start, data.end)).groupByKey().map {
-      case ((kpi, start, end), points) => saveMetrics(kpi, start, end, points.map(_.point).toSeq)
-    }
-    Future.sequence(requests).map(_ => logger.info("All kpi's saved!"))
   }
 
 }

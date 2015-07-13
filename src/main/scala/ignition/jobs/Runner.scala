@@ -16,6 +16,7 @@ object Runner {
     ("TransactionETLSetup", (context => TransactionETLSetup.run(context), Map.empty)),
     ("MainIndicatorsSetup", (context => MainIndicatorsSetup.run(context), Map.empty)),
     ("TopQueriesSetup", (context => TopQueriesSetup.run(context), Map.empty)),
+    ("SearchETLSetup", (context => SearchETLSetup.run(context), Map.empty)),
     ("ValidQueriesSetup", (context => ValidQueriesSetup.run(context), Map.empty)),
     ("AnotherSetup", (context => WordCountSetup.run(context), Map.empty)) // FIXME
   )

@@ -21,6 +21,7 @@ object IgnitionBuild extends Build {
       libraryDependencies += ("org.apache.hadoop" % "hadoop-client" % "2.0.0-cdh4.7.1" % "provided"),
       libraryDependencies += ("com.timgroup"        %  "java-statsd-client"  % "3.0.2"),
       libraryDependencies += "ch.qos.logback"      % "logback-classic" % "1.0.13",
+      libraryDependencies += "com.sksamuel.elastic4s" %% "elastic4s-core" % "1.6.2",
       libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.6",
       libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.0" % "test"
   )
