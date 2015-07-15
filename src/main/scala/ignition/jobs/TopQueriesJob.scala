@@ -8,9 +8,9 @@ object TopQueriesJob extends SearchETL {
   import ignition.jobs.utils.SearchEventValidations.SearchEventValidations
 
   case class QueryCount(query: String, count: Long)
-  case class TopQueries(apiKey: String, day: String, hasResult: Boolean, topQueries: Seq[QueryCount])
+  case class TopQueries(apiKey: String, datetime: String, hasResult: Boolean, topQueries: Seq[QueryCount])
   case class SearchKey(apiKey: String, feature: String, searchId: String)
-  case class QueryKey(apiKey: String, day: String, query: String, hasResult: Boolean)
+  case class QueryKey(apiKey: String, datetime: String, query: String, hasResult: Boolean)
 
   private val invalidQueries = Set("pigdom")
   private val invalidIpAddresses = Set("107.170.51.250")
@@ -21,7 +21,7 @@ object TopQueriesJob extends SearchETL {
 
     def queryKey = QueryKey(
       apiKey = searchLog.apiKey,
-      day = searchLog.date.withTimeAtStartOfDay.toString,
+      datetime = searchLog.date.withTimeAtStartOfDay.toString,
       query = searchLog.normalizedQuery,
       hasResult = searchLog.hasResult)
 
@@ -66,14 +66,14 @@ object TopQueriesJob extends SearchETL {
 
   def calculateTopQueries(logsByQuery: RDD[(QueryKey, Iterable[SearchLog])]): RDD[TopQueries] = {
     val rawTopQueries = logsByQuery.map {
-      case (QueryKey(apiKey, day, query, hasResult), events) =>
-        ((apiKey, day, hasResult), QueryCount(query, events.size))
+      case (QueryKey(apiKey, datetime, query, hasResult), events) =>
+        ((apiKey, datetime, hasResult), QueryCount(query, events.size))
     }.groupByKey()
 
     rawTopQueries.map {
-      case ((apiKey, day, hasResult), queries) =>
+      case ((apiKey, datetime, hasResult), queries) =>
         val topQueries = queries.toSeq.sortBy(_.count).reverse.take(100)
-        TopQueries(apiKey = apiKey, day = day, hasResult = hasResult, topQueries = topQueries)
+        TopQueries(apiKey = apiKey, datetime = datetime, hasResult = hasResult, topQueries = topQueries)
     }
   }
 
