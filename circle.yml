@@ -1,0 +1,13 @@
+checkout:
+  pre:
+    - cd search-ignition && git submodule init && git submodule update
+
+  post:
+    - mkdir -p /home/ubuntu/.sbt/.lib/sbt.version/
+    - cp /home/ubuntu/.sbt/.lib/0.13.6/sbt-launch.jar /home/ubuntu/.sbt/.lib/sbt.version/sbt-launch.jar
+    - sbt compile
+
+test:
+  override:
+    - sbt coverage test
+    - cp -r /home/ubuntu/search-api/target/scala-2.11/scoverage-report $CIRCLE_ARTIFACTS/
