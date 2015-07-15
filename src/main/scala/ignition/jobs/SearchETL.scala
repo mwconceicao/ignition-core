@@ -77,17 +77,29 @@ trait SearchETL {
       logger.info(s"Kpi $kpi for client ${resultPoint.client} at day ${resultPoint.day} with value ${resultPoint.value} saved.")
     }
 
-  def parseAutoCompleteLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] =
-    EntitiesLayer.parseSearchLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/autocompletelog/*/*.gz",
-      startDate = Option(start), endDate = Option(end)), setupName)
+  def parseAutoCompleteLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] = {
+    require(start.isBefore(end), s"Start = $start must be before end = $end")
+    val paths = for { date <- dateRangeByDay(start, end) } yield {
+      s"s3n://chaordic-search-logs/autocompletelog/${date.toString("yyyy-MM-dd")}/*.gz"
+    }
+    EntitiesLayer.parseSearchLogs(context.getTextFiles(paths), setupName)
+  }
 
-  def parseSearchLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] =
-    EntitiesLayer.parseSearchLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*/*.gz",
-      startDate = Option(start), endDate = Option(end)), setupName)
+  def parseSearchLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] = {
+    require(start.isBefore(end), s"Start = $start must be before end = $end")
+    val paths = for { date <- dateRangeByDay(start, end) } yield {
+      s"s3n://chaordic-search-logs/searchlog/${date.toString("yyyy-MM-dd")}/*.gz"
+    }
+    EntitiesLayer.parseSearchLogs(context.getTextFiles(paths), setupName)
+  }
 
-  def parseClickLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchClickLog] =
-    EntitiesLayer.parseSearchClickLogs(context.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*/*.gz",
-      startDate = Option(start), endDate = Option(end)), setupName)
+  def parseClickLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchClickLog] = {
+    require(start.isBefore(end), s"Start = $start must be before end = $end")
+    val paths = for { date <- dateRangeByDay(start, end) } yield {
+      s"s3n://chaordic-search-logs/clicklog/${date.toString("yyyy-MM-dd")}/*.gz"
+    }
+    EntitiesLayer.parseSearchClickLogs(context.getTextFiles(paths), setupName)
+  }
 
   def parseTransactions(setupName: String, context: SparkContext, start: DateTime, end: DateTime, clients: Set[String]): RDD[Transaction] = {
     require(start.isBefore(end), s"Start = $start must be before end = $end")

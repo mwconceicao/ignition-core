@@ -10,4 +10,4 @@ checkout:
 test:
   override:
     - sbt coverage test
-    - cp -r /home/ubuntu/search-api/target/scala-2.11/scoverage-report $CIRCLE_ARTIFACTS/
+    - cp -r /home/ubuntu/search-ignition/target/scala-2.10/scoverage-report $CIRCLE_ARTIFACTS/

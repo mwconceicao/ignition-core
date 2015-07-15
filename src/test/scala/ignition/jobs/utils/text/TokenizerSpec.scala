@@ -40,4 +40,8 @@ class TokenizerSpec extends FlatSpec with Matchers {
   it should "remove stop words" in {
     Tokenizer.tokenize("casa de barro") should be (Seq("casa", "barro"))
   }
+
+  it should "remove more stop words" in {
+    Tokenizer.tokenize("mae te amo com todas as cores") should be (Seq("mae", "te", "amo", "cores"))
+  }
 }
