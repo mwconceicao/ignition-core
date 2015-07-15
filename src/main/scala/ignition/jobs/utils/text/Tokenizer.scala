@@ -13,7 +13,7 @@ trait Tokenizer {
     "outra", "outras", "outro", "outros", "pelas", "pelas", "pelo", "pelos", "perante", "pois", "por", "porque",
     "portanto", "proprio", "propios", "quais", "qual", "qualquer", "quando", "quanto", "que", "quem", "quer", "se",
     "seja", "sem", "sendo", "seu", "seus", "sob", "sobre", "sua", "suas", "tal", "tambem", "teu", "teus", "toda",
-    "todos", "tua", "tuas", "tudo", "um", "uma", "umas", "uns")
+    "todas", "todo", "todos", "tua", "tuas", "tudo", "um", "uma", "umas", "uns")
 
   val delimiters = Seq("\\ ", "\\-", "\\.", "\\,", "\\/", "\\_", "\\]", "\\[", "\\)", "\\(", "\\}", "\\{", "\\~", "\\'")
 
