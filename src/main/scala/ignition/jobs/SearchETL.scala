@@ -4,7 +4,6 @@ import com.sksamuel.elastic4s.ElasticClient
 import com.sksamuel.elastic4s.ElasticDsl._
 import com.sksamuel.elastic4s.source.DocumentSource
 import ignition.chaordic.pojo.{SearchClickLog, SearchLog, Transaction}
-import ignition.chaordic.utils.ChaordicPathDateExtractor._
 import ignition.chaordic.utils.Json
 import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.jobs.TopQueriesJob.TopQueries
