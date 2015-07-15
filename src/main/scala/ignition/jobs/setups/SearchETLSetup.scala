@@ -92,8 +92,13 @@ object SearchETLSetup extends SearchETL {
       logger.info("Kpis saved to dashboard!")
     }
 
-    val fSaveTopQueries = serialBulkSaveToElasticSearch(topQueriesResults.collect()).map { _ =>
-      logger.info("Top-queries saved to elastic-search!")
+    val fSaveTopQueries = serialBulkSaveToElasticSearch(topQueriesResults.collect()).map { bulks =>
+      if (bulks.exists(_.hasFailures)) {
+        val message = bulks.filter(_.hasFailures).map(_.buildFailureMessage()).mkString("\\n")
+        logger.warn("Save operation has some errors: \\n{}", message)
+      } else {
+        logger.info("Top-queries saved to elastic-search!")
+      }
     }
 
     val fSaveOperation = fSaveKpis.zip(fSaveTopQueries)

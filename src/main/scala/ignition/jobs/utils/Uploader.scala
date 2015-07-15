@@ -103,8 +103,12 @@ object Uploader extends SearchETL {
           val topQueries = parseTopQueries(getLines(path))
           logger.info(s"Executing top-queries uploads to Elastic Search server: $clusterName, address: $server:$port")
           serialBulkSaveToElasticSearch(topQueries, bulkSize)(ec, timeout, client).map { bulks =>
-            val message = bulks.filter(_.hasFailures).map(_.buildFailureMessage()).mkString("\\n")
-            logger.warn("Save operation has some errors: \\n{}", message)
+            if (bulks.exists(_.hasFailures)) {
+              val message = bulks.filter(_.hasFailures).map(_.buildFailureMessage()).mkString("\\n")
+              logger.warn("Save operation has some errors: \\n{}", message)
+            } else {
+              logger.info("Top-queries saved to elastic-search!")
+            }
           }
 
         case UploaderConfig("kpi", path, _, _, _, _, dashboardSaveTimeoutInMinutes, _) if path.nonEmpty =>
