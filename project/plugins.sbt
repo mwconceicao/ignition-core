@@ -9,3 +9,5 @@ addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.7.4")
 resolvers += Resolver.sonatypeRepo("snapshots")
 
 addSbtPlugin("org.ensime" % "ensime-sbt" % "0.1.5-SNAPSHOT")
+
+addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.1.0")
