@@ -1,6 +1,6 @@
 checkout:
   pre:
-    - cd search-ignition && git submodule update
+    - cd search-ignition && git submodule init && git submodule update
 
   post:
     - mkdir -p /home/ubuntu/.sbt/.lib/sbt.version/
