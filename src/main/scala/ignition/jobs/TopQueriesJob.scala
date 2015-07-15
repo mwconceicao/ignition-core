@@ -36,6 +36,7 @@ object TopQueriesJob extends SearchETL {
     def isValidFeature: Boolean = if (searchLog.realFeature == "autocomplete" && !searchLog.hasResult) false else true
   }
 
+
   def execute(searchLogs: RDD[SearchLog]): RDD[TopQueries] = {
     val filtered = filterValidEvents(searchLogs).keyBy(_.searchKey).groupByKey()
     val uniqueSearchesByAutocomplete = fixAutocompleteDuplication(filtered)
@@ -50,7 +51,7 @@ object TopQueriesJob extends SearchETL {
 
   def fixAutocompleteDuplication(searchLogByKey: RDD[(SearchKey, Iterable[SearchLog])]): RDD[(SearchKey, Iterable[SearchLog])] =
     searchLogByKey.map {
-      case (key @ SearchKey(_, "autocomplete", _), events) =>
+      case (key, events) if key.feature == "autocomplete" =>
         // should materialize?
         (key, events.toSeq.sortBy(_.query.length).reverse.lastOption.toSeq)
       case other => other

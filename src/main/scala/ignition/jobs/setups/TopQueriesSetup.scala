@@ -22,7 +22,7 @@ object TopQueriesSetup extends SearchETL  {
     TopQueriesJob.execute(parsedSearchLogs)
       .repartition(numPartitions = 1)
       .map(transformToJsonString)
-      .saveAsTextFile(s"s3n://chaordic-search-ignition-history/top-queries/${config.tag}")
+      .saveAsTextFile(s"s3n://chaordic-search-ignition-history/${config.setupName}/${config.user}/${config.tag}")
 
     logger.info(s"TopQueriesJob done.")
   }
