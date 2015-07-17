@@ -97,8 +97,6 @@ trait SearchGenerators {
 
 class TopQueriesJobSpec extends FlatSpec with SearchGenerators with ShouldMatchers with SharedSparkContext with GeneratorDrivenPropertyChecks with BetterTrace {
 
-  implicit override val generatorDrivenConfig = PropertyCheckConfig(workers = 4)
-
   "TopQueriesJob" should "calculate top queries" taggedAs SlowTest in {
     val queriesWithResult = Gen.frequency(
       (50, "banco imobiliário"),
@@ -130,8 +128,11 @@ class TopQueriesJobSpec extends FlatSpec with SearchGenerators with ShouldMatche
 
     val gSearchLogWithResults = Gen.listOfN(100, searchLogGenerator(gApiKey = Gen.const("apiKey-with-results"),
       gQuery = queriesWithResult, gTotalFound = Gen.chooseNum(5, 20)))
-    val gSearchLogWithoutResults = Gen.listOfN(100, searchLogGenerator(gApiKey = Gen.const("apiKey-without-results"),
-      gQuery = queriesWithoutResult, gTotalFound = Gen.const(0)))
+    val gSearchLogWithoutResults = Gen.listOfN(100, searchLogGenerator(
+      gApiKey = Gen.const("apiKey-without-results"),
+      gQuery = queriesWithoutResult,
+      gTotalFound = Gen.const(0),
+      gFeature = Gen.oneOf("rank-fallback", "redirect", "spelling-fallback", "standard")))
 
     forAll(gSearchLogWithResults, gSearchLogWithoutResults) { (result, without) =>
       withBetterTrace {

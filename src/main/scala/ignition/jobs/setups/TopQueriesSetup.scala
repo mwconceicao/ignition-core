@@ -22,10 +22,7 @@ object TopQueriesSetup extends SearchETL  {
     TopQueriesJob.execute(parsedSearchLogs)
       .repartition(numPartitions = 1)
       .map(transformToJsonString)
-      .saveAsTextFile(s"s3n://chaordic-search-ignition-history/top-queries/${config.tag}")
-
-    // TODO: use this:
-    // .saveAsTextFile(s"s3n://mail-ignition/${runnerConfig.setupName}/${runnerConfig.user}/userContexts/${runnerConfig.tag}", classOf[GzipCodec])
+      .saveAsTextFile(s"s3n://chaordic-search-ignition-history/${config.setupName}/${config.user}/${config.tag}")
 
     logger.info(s"TopQueriesJob done.")
   }
@@ -33,7 +30,7 @@ object TopQueriesSetup extends SearchETL  {
   def transformToJsonString(topQueries: TopQueries): String = {
     val topQueriesAsMap = Map(
       "apiKey" -> topQueries.apiKey,
-      "datetime" -> topQueries.day,
+      "datetime" -> topQueries.datetime,
       "queries_has_results" -> topQueries.hasResult,
       "event" -> "top_queries",
       "top_queries" -> topQueries.topQueries.map(query =>

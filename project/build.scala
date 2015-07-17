@@ -1,8 +1,7 @@
 import sbt._
-import sbt.Keys._
+import Keys._
 
 object IgnitionBuild extends Build {
-
 
   lazy val root = project.in(file("."))
     .dependsOn(file("chaordic"))
@@ -16,13 +15,13 @@ object IgnitionBuild extends Build {
       // Because we can't run two spark contexts on same VM
       parallelExecution in Test := false,
       resolvers += "Cloudera Repository" at "https://repository.cloudera.com/artifactory/cloudera-repos/",
-      libraryDependencies += ("org.apache.spark" %% "spark-core" % "1.3.0" % "provided")
-        .exclude("org.apache.hadoop", "hadoop-client"),
-      libraryDependencies += ("org.apache.hadoop" % "hadoop-client" % "2.0.0-cdh4.7.1" % "provided"),
-      libraryDependencies += ("com.timgroup"        %  "java-statsd-client"  % "3.0.2"),
-      libraryDependencies += "ch.qos.logback"      % "logback-classic" % "1.0.13",
-      libraryDependencies += "com.sksamuel.elastic4s" %% "elastic4s-core" % "1.6.2",
-      libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.0.6",
-      libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.0" % "test"
-  )
+      libraryDependencies ++= Seq(
+        ("org.apache.spark" %% "spark-core" % "1.3.0" % "provided").exclude("org.apache.hadoop", "hadoop-client"),
+        "org.apache.hadoop" % "hadoop-client" % "2.0.0-cdh4.7.1" % "provided",
+        "com.timgroup" %  "java-statsd-client"  % "3.0.2",
+        "ch.qos.logback" % "logback-classic" % "1.0.13",
+        ("com.sksamuel.elastic4s" %% "elastic4s" % "1.2.1.3").exclude("commons-io", "commons-io"),
+        "org.scalaz" %% "scalaz-core" % "7.0.6",
+        "org.scalatest" % "scalatest_2.10" % "2.0" % "test"))
+
 }

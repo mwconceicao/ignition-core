@@ -2,28 +2,19 @@ package ignition.jobs.setups
 
 import java.util.concurrent.Executors
 
-import ignition.chaordic.utils.Json
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.jobs.MainIndicators.MainIndicatorKey
-import ignition.jobs.TopQueriesJob.TopQueries
-import ignition.jobs.setups.MainIndicatorsSetup._
-import ignition.jobs.setups.SitemapXMLSetup.logger
-import ignition.jobs.setups.SitemapXMLSetup.logger
-import ignition.jobs.setups.TransactionETLSetup._
-import ignition.jobs.setups.TransactionETLSetup.logger
-import ignition.jobs.utils.DashboardAPI.{DashPoint, ResultPoint}
-import ignition.jobs.utils.Uploader.KpiWithDashPoint
-import ignition.jobs.{TopQueriesJob, MainIndicators, TransactionETL, SearchETL}
 import ignition.jobs.setups.SitemapXMLSetup._
-import ignition.jobs.utils.{Uploader, SearchApi}
-import org.apache.hadoop.io.compress.GzipCodec
+import ignition.jobs.utils.DashboardAPI.DashPoint
+import ignition.jobs.utils.SearchApi
+import ignition.jobs.{MainIndicators, SearchETL, TopQueriesJob, TransactionETL}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{Await, Future, ExecutionContext}
 import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.{Await, ExecutionContext}
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
@@ -40,7 +31,7 @@ object SearchETLSetup extends SearchETL {
     val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(1).withTimeAtStartOfDay())
     val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.minusDays(1).withTime(23, 59, 59, 999))
 
-    val timeoutForSaveOperation: FiniteDuration = 30 minutes
+    implicit val timeoutForSaveOperation: FiniteDuration = 30 minutes
 
     logger.info(s"Starting SearchETL for start=$start, end=$end")
 
@@ -97,12 +88,17 @@ object SearchETLSetup extends SearchETL {
       .saveAsTextFile(s"$s3Prefix/top-queries")
     logger.info(s"TopQueries saved to s3, path = $s3Prefix/top-queries")
 
-    val fSaveKpis = Uploader.saveKpisToDashBoard(kpis.collect()).map { _ =>
+    val fSaveKpis = saveKpisToDashBoard(kpis.collect().toSeq).map { _ =>
       logger.info("Kpis saved to dashboard!")
     }
 
-    val fSaveTopQueries = Uploader.saveTopQueriesToElasticSearch(topQueriesResults.collect()).map { _ =>
-      logger.info("Top-queries saved to elastic-search!")
+    val fSaveTopQueries = serialBulkSaveToElasticSearch(topQueriesResults.collect()).map { bulks =>
+      if (bulks.exists(_.hasFailures)) {
+        val message = bulks.filter(_.hasFailures).map(_.buildFailureMessage()).mkString("\\n")
+        logger.warn("Save operation has some errors: \\n{}", message)
+      } else {
+        logger.info("Top-queries saved to elastic-search!")
+      }
     }
 
     val fSaveOperation = fSaveKpis.zip(fSaveTopQueries)
