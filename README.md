@@ -11,7 +11,7 @@ Jobs Available:
 - SearchETLSetup
 - ValidQueriesSetup
 
-## How to run one Job?
+## Getting Started - How to run one Job?
 
 - Check if you have Java 7
 - Clone the repo with --recursive
@@ -35,8 +35,21 @@ core/tools/cluster.py destroy valid-queries-dev
 All jobs are "self-contained" if your job runs properly you don't need to do anything else. It will send the data to the
 right place: DashboardAPI, Elasticsearch or S3.
 
-#TODO: explain how to change the default date.
-#TODO: how to send individual metrics using uploader?
+## Tests
+
+First, clone everything like stated above. Run the tests with:
+```
+./sbt test
+```
+
+If you want to run a single job, you can use:
+```
+./sbt testOnly *ValidQ*
+```
+for running ValidQueries tests.
+
+#TODO: RODAR RETROATIVO.
+#TODO: UPLOADER SOZINHO.
 
 ## Configuration
 
