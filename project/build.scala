@@ -8,7 +8,7 @@ object IgnitionBuild extends Build {
     .aggregate(file("chaordic"))
     .settings(net.virtualvoid.sbt.graph.Plugin.graphSettings: _*)
     .settings(
-      name := "ignition-template",
+      name := "search-ignition",
       version := "1.0",
       scalaVersion := "2.10.4",
       scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xfatal-warnings"),
