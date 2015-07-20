@@ -2,12 +2,15 @@ package ignition.jobs.setups
 
 import java.util.concurrent.Executors
 
+import akka.actor.ActorSystem
+import ignition.chaordic.utils.Json
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.jobs.MainIndicators.MainIndicatorKey
+import ignition.jobs.SearchETL.KpiWithDashPoint
 import ignition.jobs.setups.SitemapXMLSetup._
 import ignition.jobs.utils.DashboardAPI.DashPoint
-import ignition.jobs.utils.SearchApi
-import ignition.jobs.{MainIndicators, SearchETL, TopQueriesJob, TransactionETL}
+import ignition.jobs.utils.{ElasticSearchClient, SearchApi}
+import ignition.jobs._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.joda.time.DateTime
@@ -22,7 +25,9 @@ object SearchETLSetup extends SearchETL {
 
   lazy val logger = LoggerFactory.getLogger("ignition.TransactionETLSetup")
 
-  implicit val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
+  implicit lazy val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
+  implicit lazy val actorSystem = ActorSystem("SearchETLSetup")
+  lazy val elasticSearch = new ElasticSearchClient(Configuration.elasticSearchHost, Configuration.elasticSearchPort)
 
   def run(runnerContext: RunnerContext) {
     val sc = runnerContext.sparkContext
@@ -60,7 +65,7 @@ object SearchETLSetup extends SearchETL {
     val mainIndicatorsResults = MainIndicators.process(searchLogs, autoCompleteLogs, clickLogs)
 
     def toDashPoint(tuple: (MainIndicatorKey, Int)): DashPoint = tuple match {
-      case (indicator, value) => indicator.toResultPoint(value)
+      case (indicator, value) => indicator.toFeaturedResultPoint(value)
     }
 
     def toKpi[T <: DashPoint](kpi: String, start: DateTime, end: DateTime, points: RDD[T]): RDD[KpiWithDashPoint] =
@@ -79,7 +84,7 @@ object SearchETLSetup extends SearchETL {
       toKpi("unique_autocomplete_clicks", start, end, mainIndicatorsResults.autoCompleteUniqueClickMetrics.map(toDashPoint)))
       .repartition(numPartitions = 1).persist(StorageLevel.MEMORY_AND_DISK)
 
-    kpis.saveAsTextFile(s"$s3Prefix/kpis")
+    kpis.map(Json.toJson4sString).saveAsTextFile(s"$s3Prefix/kpis")
     logger.info(s"Kpis saved to s3, path = $s3Prefix/kpis")
 
     topQueriesResults
@@ -92,13 +97,13 @@ object SearchETLSetup extends SearchETL {
       logger.info("Kpis saved to dashboard!")
     }
 
-    val fSaveTopQueries = serialBulkSaveToElasticSearch(topQueriesResults.collect()).map { bulks =>
-      if (bulks.exists(_.hasFailures)) {
-        val message = bulks.filter(_.hasFailures).map(_.buildFailureMessage()).mkString("\\n")
-        logger.warn("Save operation has some errors: \\n{}", message)
-      } else {
-        logger.info("Top-queries saved to elastic-search!")
-      }
+    val fSaveTopQueries = elasticSearch.serialSaveTopQueries(topQueriesResults.collect().toSeq, bulkSize = 50)
+    fSaveTopQueries.onComplete {
+      case Success(result) =>
+        logger.info(s"Top-queries saved to elastic-search! Details: $result")
+      case Failure(exception) =>
+        logger.error("Fail to bulk index top queries", exception)
+        throw exception
     }
 
     val fSaveOperation = fSaveKpis.zip(fSaveTopQueries)

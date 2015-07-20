@@ -20,7 +20,6 @@ object IgnitionBuild extends Build {
         "org.apache.hadoop" % "hadoop-client" % "2.0.0-cdh4.7.1" % "provided",
         "com.timgroup" %  "java-statsd-client"  % "3.0.2",
         "ch.qos.logback" % "logback-classic" % "1.0.13",
-        ("com.sksamuel.elastic4s" %% "elastic4s" % "1.2.1.3").exclude("commons-io", "commons-io"),
         "org.scalaz" %% "scalaz-core" % "7.0.6",
         "org.scalatest" % "scalatest_2.10" % "2.0" % "test"))
 

@@ -52,7 +52,6 @@ object Configuration {
   lazy val dashboardApiUser = RawConfiguration.getString("dashboard-api.user")
   lazy val dashboardApiPassword = RawConfiguration.getString("dashboard-api.password")
 
-  lazy val elasticSearchClusterName = RawConfiguration.getString("elastic-search.cluster-name")
   lazy val elasticSearchHost = RawConfiguration.getString("elastic-search.url")
   lazy val elasticSearchPort = RawConfiguration.getInt("elastic-search.port")
 

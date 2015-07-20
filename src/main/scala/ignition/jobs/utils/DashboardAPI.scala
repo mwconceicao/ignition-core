@@ -123,10 +123,6 @@ object DashboardAPI extends DashboardApikeyConversion{
     }
   }
 
-  val dashboardPipeline: SendReceive = (
-    addHeader(HttpHeaders.`Content-Type`(`application/json`)) ~>
-    addCredentials(BasicHttpCredentials(user, password))
-      ~> sendReceive
-    )
+  val dashboardPipeline: SendReceive = addCredentials(BasicHttpCredentials(user, password)) ~> sendReceive
 
 }
