@@ -71,9 +71,9 @@ object SearchETLSetup extends SearchETL {
     def toKpi[T <: DashPoint](kpi: String, start: DateTime, end: DateTime, points: RDD[T]): RDD[KpiWithDashPoint] =
       points.map(point => KpiWithDashPoint(kpi, start, end, point))
 
-    val kpis = sc.union(toKpi("sales_search", start, end, transactionsResults.salesSearch),
+    val kpis = sc.union(
       toKpi("sales_search", start, end, transactionsResults.salesSearch),
-      toKpi("sales_overall", start, end, transactionsResults.salesSearch),
+      toKpi("sales_overall", start, end, transactionsResults.salesOverall),
       toKpi("searches", start, end, mainIndicatorsResults.searchMetrics.map(toDashPoint)),
       toKpi("unique_searches", start, end, mainIndicatorsResults.searchUniqueMetrics.map(toDashPoint)),
       toKpi("search_clicks", start, end, mainIndicatorsResults.searchClickMetrics.map(toDashPoint)),
