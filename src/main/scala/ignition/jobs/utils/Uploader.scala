@@ -108,7 +108,8 @@ object Uploader extends SearchETL {
                                      latest_search_log: String,
                                      queries: Seq[RawValidQuery],
                                      clicks: Long) {
-    def convert: ValidQueryFinal = ValidQueryFinal(apiKey = ???,
+    def convert: ValidQueryFinal = ValidQueryFinal(
+      apiKey = apiKey,
       tokens = tokens,
       topQuery = top_query,
       searches = searchs,
