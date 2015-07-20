@@ -127,4 +127,4 @@ DashboardAPI/Elasticsearch.
 ## ValidQueriesSetup
 
 Calculate ValidQueries, it is used to create autocomplete and query suggestions for our users. The result is saved to
-S3 and then sent to Elasticsearch.
+S3 and then sent to Elasticsearch. For detailed information check the file ValidQueriesJob.scala.
