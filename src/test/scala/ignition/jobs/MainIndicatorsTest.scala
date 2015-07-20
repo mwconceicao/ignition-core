@@ -60,9 +60,9 @@ class MainIndicatorsTest extends FlatSpec with SearchGenerators with ShouldMatch
   "getMetrics" should "count elements with the same MainIndicatorKey" in {
     val freqs = Gen.frequency(
       (4, SearchLog("apikey1", DateTime.now, "search", 1, List.empty, None, 1, None, "", "", None, Map("searchId" -> "schorstein"))),
-      (4, SearchClickLog("apikey1", "", DateTime.now, "", "search", Map("searchId" -> "schorstein"))),
+      (4, SearchClickLog("apikey1", "", DateTime.now, "", "search", List.empty, Map("searchId" -> "schorstein"))),
       (6, SearchLog("apikey2", DateTime.now, "search", 1, List.empty, None, 1, None, "", "", None, Map("searchId" -> "bierland"))),
-      (6, SearchClickLog("apikey2", "", DateTime.now, "", "search", Map("searchId" -> "bierland")))
+      (6, SearchClickLog("apikey2", "", DateTime.now, "", "search", List.empty, Map("searchId" -> "bierland")))
     )
     val seqSize = 1000.0
     forAll(Gen.listOfN(seqSize.toInt, freqs)) {

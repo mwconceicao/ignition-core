@@ -48,8 +48,13 @@ If you want to run a single job, you can use:
 ```
 for running ValidQueries tests.
 
-#TODO: RODAR RETROATIVO.
-#TODO: UPLOADER SOZINHO.
+# How do I run it for a time frame other than the default, i.e. arbitrary time intervals?
+
+FIXME: You can't. Ignition Core does not support it yet.
+
+# Sometimes you have the output on S3 and you want to upload it? New cluster?
+
+## TODO: EXPLAIN UPLOADER
 
 ## Configuration
 
@@ -141,3 +146,7 @@ DashboardAPI/Elasticsearch.
 
 Calculate ValidQueries, it is used to create autocomplete and query suggestions for our users. The result is saved to
 S3 and then sent to Elasticsearch. For detailed information check the file ValidQueriesJob.scala.
+
+# Deploy
+
+Check [search-ansible](https://github.com/chaordic/search-ansible)

@@ -30,6 +30,7 @@ trait SearchGenerators {
                               gFeature: Gen[String] = gFeature,
                               gQuery: Gen[String] = Gen.alphaStr,
                               gUserId: Gen[String] = Gen.alphaStr,
+                              gSearchProduct: Gen[List[SearchProduct]] = Gen.listOf(searchProductGenerator()),
                               gInfo: Gen[Map[String, String]] = gInfo): Gen[SearchClickLog] = {
     for {
       apiKey <- gApiKey
@@ -37,8 +38,9 @@ trait SearchGenerators {
       query <- gQuery
       feature <- gFeature
       userId <- gUserId
+      products <- gSearchProduct
       info <- gInfo
-    } yield SearchClickLog(apiKey, userId, date, query, feature, info)
+    } yield SearchClickLog(apiKey, userId, date, query, feature, products, info)
   }
 
   def searchLogGenerator(gApiKey: Gen[String] = gApiKey,
