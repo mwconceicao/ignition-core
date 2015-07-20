@@ -5,6 +5,8 @@ import ignition.jobs.utils.text.{ChaordicStemmer, Tokenizer}
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 
+import scala.reflect.ClassTag
+
 /**
  * This Job is of utmost importance. This generate values for the index `valid_queries` that is maintained on our
  * Elasticsearch. This index is used to generate query recommendations in auto complete and also query suggestions on
@@ -30,8 +32,7 @@ object ValidQueriesJob {
   val lastDaysToConsider = DateTime.now.minusDays(365)
 
   implicit class SearchEventImprovements(searchEvent: SearchEvent) {
-    def validDate =
-      searchEvent.date.isAfter(lastDaysToConsider)
+    def validDate = searchEvent.date.isAfter(lastDaysToConsider)
   }
 
   implicit class TypoRemover(query: String) {
@@ -203,6 +204,15 @@ object ValidQueriesJob {
     }
   }
 
+  def countByKey[T <: SearchEvent:ClassTag](filteredSearchLogs: RDD[((String, String), T)]): RDD[((String, String), Long)] =
+    filteredSearchLogs.mapValues(_ => 1L).reduceByKey(_ + _)
+
+  def sumOfResultsByKey(filteredSearchLogs: RDD[((String, String), SearchLog)]): RDD[((String, String), Long)] =
+    filteredSearchLogs.mapValues(_.totalFound.toLong).reduceByKey(_ + _)
+
+  def getLatestSearchLogsByKey(filteredSearchLogs: RDD[((String, String), SearchLog)]): RDD[((String, String), SearchLog)] =
+    filteredSearchLogs.reduceByKey((s1, s2) => if (s1.date.isAfter(s2.date)) s1 else s2)
+
   def process(searchLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): RDD[ValidQueryFinal] = {
 
     val validSearchLogs = getValidSearchLogs(searchLogs)
@@ -212,23 +222,21 @@ object ValidQueriesJob {
       .keyBy(clickLog => (clickLog.apiKey, clickLog.searchId))
 
     // Filter and remap key
-    val filteredClickLogs = filterClicksWithoutSearch(validSearchLogs, validClickLogs)
+    val filteredClickLogs = filterClicksWithoutSearch(validSearchLogs, validClickLogs).persist()
 
     // remap key
-    val filteredSearchLogs = validSearchLogs
+    val filteredSearchLogs: RDD[((String, String), SearchLog)] = validSearchLogs
       .map { case ((apiKey, searchId), log) => ((apiKey, log.query), log) }
 
     // Count Events
-    val clicks: RDD[((String, String), Long)] = filteredClickLogs.mapValues(_ => 1L).reduceByKey(_ + _)
-    val searches: RDD[((String, String), Long)] = filteredSearchLogs.mapValues(_ => 1L).reduceByKey(_ + _)
+    val clicks: RDD[((String, String), Long)] = countByKey(filteredClickLogs)
+    val searches: RDD[((String, String), Long)] = countByKey(filteredSearchLogs)
 
     // Sum the number of products returned by the all the searches by a given apikey and query.
-    val sumOfResults: RDD[((String, String), Long)] = filteredSearchLogs
-      .mapValues(_.totalFound.toLong).reduceByKey(_ + _)
+    val sumOfResults: RDD[((String, String), Long)] = sumOfResultsByKey(filteredSearchLogs)
 
     // Get the latest by date.
-    val latestSearchLogs: RDD[((String, String), SearchLog)] = filteredSearchLogs
-      .reduceByKey((s1, s2) => if (s1.date.isAfter(s2.date)) s1 else s2)
+    val latestSearchLogs: RDD[((String, String), SearchLog)] = getLatestSearchLogsByKey(filteredSearchLogs)
 
     // Get Valid Queries
     val validQueries = joinEventsAndGetValidQueries(clicks, searches, latestSearchLogs, sumOfResults)
