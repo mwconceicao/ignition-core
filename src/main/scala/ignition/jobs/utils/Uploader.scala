@@ -5,11 +5,13 @@ import java.nio.file.{Files, Paths}
 import java.util.concurrent.{Executors, TimeUnit}
 import java.util.zip.GZIPInputStream
 
-import com.sksamuel.elastic4s.ElasticClient
+import akka.actor.ActorSystem
+import ignition.chaordic.Chaordic
 import ignition.core.utils.S3Client
+import ignition.jobs.SearchETL.KpiWithDashPoint
 import ignition.jobs.TopQueriesJob.{QueryCount, TopQueries}
+import ignition.jobs.ValidQueriesJob.{ValidQuery, ValidQueryFinal}
 import ignition.jobs.{Configuration, SearchETL}
-import org.elasticsearch.common.settings.ImmutableSettings
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.slf4j.LoggerFactory
@@ -20,6 +22,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
 import scala.io.{Codec, Source}
 import scala.language.postfixOps
+import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 
 object Uploader extends SearchETL {
@@ -44,15 +47,19 @@ object Uploader extends SearchETL {
     implicit val kpiWithDashPointFormat = jsonFormat4(KpiWithDashPoint)
     implicit val rawQueryCountFormat = jsonFormat2(RawQueryCount)
     implicit val rawTopQueriesFormat = jsonFormat5(RawTopQueries)
+    implicit val rawValidQueryFormat = jsonFormat9(RawValidQuery)
+    implicit val rawValidQueriesFormat = jsonFormat11(RawValidQueries)
 
   }
 
   import UploaderSprayJsonFormatter._
   import spray.json._
 
-  private implicit lazy val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   private lazy val s3Client = new S3Client
   private lazy val logger = LoggerFactory.getLogger("ignition.UploaderCLI")
+
+  implicit lazy val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
+  implicit lazy val actorSystem = ActorSystem("uploader")
 
   private case class RawQueryCount(query: String, count: Int)
 
@@ -68,24 +75,70 @@ object Uploader extends SearchETL {
       topQueries = top_queries.map(e => QueryCount(query = e.query, count = e.count)))
   }
 
+  private case class RawValidQuery(raw_ctr: Double,
+                                   apiKey: String,
+                                   average_results: Long,
+                                   latest_search_log_results: Int,
+                                   latest_search_log: String,
+                                   latest_search_log_feature: String,
+                                   searchs: Long,
+                                   query: String,
+                                   clicks: Long) {
+    def convert: ValidQuery = ValidQuery(
+      apiKey = apiKey,
+      query = query,
+      searches = searchs,
+      clicks = clicks,
+      rawCtr = raw_ctr,
+      latestSearchLog = Chaordic.parseDate(latest_search_log),
+      latestSearchLogResults = latest_search_log_results,
+      latestSearchLogFeature = latest_search_log_feature,
+      sumResults = 0, // not used
+      averageResults = average_results)
+  }
+
+  private case class RawValidQueries(top_query: String,
+                                     apiKey: String,
+                                     raw_ctr: Int,
+                                     tokens: Seq[String],
+                                     latest_search_log_results: Int,
+                                     searchs: Long,
+                                     active: Boolean,
+                                     average_results: Long,
+                                     latest_search_log: String,
+                                     queries: Seq[RawValidQuery],
+                                     clicks: Long) {
+    def convert: ValidQueryFinal = ValidQueryFinal(apiKey = ???,
+      tokens = tokens,
+      topQuery = top_query,
+      searches = searchs,
+      clicks = clicks,
+      rawCtr = raw_ctr,
+      latestSearchLog = Chaordic.parseDate(latest_search_log),
+      latestSearchLogResults = latest_search_log_results,
+      averageResults = average_results,
+      queries = queries.map(_.convert),
+      active = active)
+  }
+
   private case class UploaderConfig(eventType: String = "",
                                     path: String = "",
                                     server: String = Configuration.elasticSearchHost,
-                                    clusterName: String = Configuration.elasticSearchClusterName,
                                     port: Int = Configuration.elasticSearchPort,
-                                    bulkTimeoutInMinutes: Long = 30,
-                                    dashboardSaveTimeoutInMinutes: Long = 20,
-                                    bulkSize: Int = 50)
+                                    bulkTimeoutInMinutes: Int = 5,
+                                    bulkSize: Int = 50,
+                                    validQueriesIndexConfigPath: Option[String] = None)
 
   def main (args: Array[String]) {
     val parser = new scopt.OptionParser[UploaderConfig]("Uploader") {
       help("help").text("prints this usage text")
-      arg[String]("eventType") required() action { (x, c) => c.copy(eventType = x) } text "kpi | top-queries"
+      arg[String]("eventType") required() action { (x, c) => c.copy(eventType = x) } text "(kpi | top-queries | valid-queries)"
       arg[String]("path") required() action { (x, c) => c.copy(path = x) }  text "can be dir or file from 's3://<bucket>/<key>' or '/local/file/system'"
+      opt[String]('j', "valid-queries-json-config") action { (x, c) => c.copy(validQueriesIndexConfigPath = Option(x)) }
       opt[String]('s', "es-server") action { (x, c) => c.copy(server = x) }
       opt[String]('n', "es-cluster-name") action { (x, c) => c.copy(server = x) }
       opt[Int]('p', "es-port") action { (x, c) => c.copy(port = x) }
-      opt[Long]('t', "es-save-timeout-minutes-per-bulk") action { (x, c) => c.copy(bulkTimeoutInMinutes = x) }
+      opt[Int]('t', "es-save-timeout-minutes-per-bulk") action { (x, c) => c.copy(bulkTimeoutInMinutes = x) }
       opt[Int]('b', "es-bulk-size") action { (x, c) => c.copy(bulkSize = x) }
     }
 
@@ -94,27 +147,15 @@ object Uploader extends SearchETL {
     }
 
     try {
-      parser.parse(args, UploaderConfig()).map {
-        case UploaderConfig("top-queries", path, server, clusterName, port, timeoutInMinutes, _, bulkSize) if path.nonEmpty =>
-          val client = ElasticClient.remote(
-            settings = ImmutableSettings.settingsBuilder().put("cluster.name", clusterName).build(),
-            addresses = (server, port))
-          val timeout = Duration(timeoutInMinutes, TimeUnit.MINUTES)
-          val topQueries = parseTopQueries(getLines(path))
-          logger.info(s"Executing top-queries uploads to Elastic Search server: $clusterName, address: $server:$port")
-          serialBulkSaveToElasticSearch(topQueries, bulkSize)(ec, timeout, client).map { bulks =>
-            if (bulks.exists(_.hasFailures)) {
-              val message = bulks.filter(_.hasFailures).map(_.buildFailureMessage()).mkString("\\n")
-              logger.warn("Save operation has some errors: \\n{}", message)
-            } else {
-              logger.info("Top-queries saved to elastic-search!")
-            }
-          }
+      parser.parse(args, UploaderConfig()).foreach {
+        case UploaderConfig("top-queries", path, server, port, timeoutInMinutes, bulkSize, _) if path.nonEmpty =>
+          runTopQueries(path, server, port, timeoutInMinutes, bulkSize)
 
-        case UploaderConfig("kpi", path, _, _, _, _, dashboardSaveTimeoutInMinutes, _) if path.nonEmpty =>
-          val kpis = parseKpis(getLines(path))
-          logger.info("Executing kpi uploads to Dashboard API")
-          Await.result(saveKpisToDashBoard(kpis), Duration(dashboardSaveTimeoutInMinutes, TimeUnit.MINUTES))
+        case UploaderConfig("valid-queries", path, server, port, timeoutInMinutes, bulkSize, config) if path.nonEmpty =>
+          runValidQueries(path, server, port, timeoutInMinutes, bulkSize, config)
+
+        case UploaderConfig("kpi", path, _, _, _, timeoutInMinutes, _) if path.nonEmpty =>
+          runKpis(path, timeoutInMinutes)
 
         case _ => throw new IllegalArgumentException(s"Invalid parameters: $parser")
       }
@@ -132,8 +173,47 @@ object Uploader extends SearchETL {
     sys.exit()
   }
 
-  private def parseTopQueries(lines: Seq[String]): Seq[TopQueries] = lines.map { line =>
-    try { line.parseJson.convertTo[RawTopQueries].convert }
+  private def runKpis(path: String, timeoutInMinutes: Int): Unit = {
+    val kpis = parseLines[KpiWithDashPoint](getLines(path))
+    logger.info("Executing kpi uploads to Dashboard API")
+    Await.result(saveKpisToDashBoard(kpis), Duration(timeoutInMinutes, TimeUnit.MINUTES))
+  }
+
+  private def runTopQueries(path: String, server: String, port: Int, timeoutInMinutes: Int, bulkSize: Int): Unit = {
+    val timeout = Duration(timeoutInMinutes, TimeUnit.MINUTES)
+    val topQueries = parseLines[RawTopQueries](getLines(path))
+    logger.info(s"Executing top-queries uploads to Elastic Search server: $server:$port")
+    val client = new ElasticSearchClient(server, port)
+    val indexOperation = client.serialSaveTopQueries(topQueries.map(_.convert), bulkSize)(timeout)
+    indexOperation.onComplete {
+      case Success(result) =>
+        logger.info(s"Top-queries saved to elastic-search! Details: $result")
+      case Failure(ex) =>
+        logger.error("Fail to bulk index top queries", ex)
+        sys.exit(1)
+    }
+    Await.result(indexOperation, timeout * topQueries.size)
+  }
+
+  private def runValidQueries(path: String, server: String, port: Int, timeoutInMinutes: Int, bulkSize: Int, jsonIndexConfig: Option[String]): Unit = {
+    val timeout = Duration(timeoutInMinutes, TimeUnit.MINUTES)
+    val validQueries = parseLines[RawValidQueries](getLines(path))
+    logger.info(s"Executing valid-queries uploads to Elastic Search server: $server:$port")
+    val client = new ElasticSearchClient(server, port)
+    val configContent = jsonIndexConfig.map(getClass.getResource).getOrElse(getClass.getResource("/valid_queries_index_configuration.json"))
+    val indexOperation = client.saveValidQueries(validQueries.map(_.convert), Source.fromURL(configContent).mkString, bulk = bulkSize)(timeout)
+    indexOperation.onComplete {
+      case Success(result) =>
+        logger.info(s"Top-queries saved to elastic-search! Details: $result")
+      case Failure(ex) =>
+        logger.error("Fail to bulk index top queries", ex)
+        sys.exit(1)
+    }
+    Await.result(indexOperation, timeout * validQueries.size)
+  }
+
+  private def parseLines[T](lines: Seq[String])(implicit reader: JsonReader[T]): Seq[T] = lines.map { line =>
+    try { line.parseJson.convertTo[T] }
     catch {
       case ex: JsonParser.ParsingException =>
         logger.error("Parsing error: json = '', message: '{}'", line, ex.getMessage)
@@ -141,16 +221,7 @@ object Uploader extends SearchETL {
     }
   }
 
-  private def parseKpis(lines: Seq[String]): Seq[KpiWithDashPoint] = lines.map { line =>
-    try { line.parseJson.convertTo[KpiWithDashPoint] }
-    catch {
-      case ex: JsonParser.ParsingException =>
-        logger.error("Parsing error: json = '', message: '{}'", line, ex.getMessage)
-        sys.exit(1)
-    }
-  }
-
-  private def getLines(path: String) = {
+  private def getLines(path: String): Seq[String] = {
     implicit val codec = Codec.UTF8
 
     val isS3Path = path.startsWith("s3://")
@@ -177,7 +248,7 @@ object Uploader extends SearchETL {
     val s3Pattern = "(s3?://)?([a-zA-Z0-9\\-]+)/(.*)".r
 
     def linesFromS3(path: String): Seq[String] = path match {
-      case s3Pattern(_, bucket, key) => {
+      case s3Pattern(_, bucket, key) =>
         logger.info("Loading data from S3, path: {}", path)
         s3Client.list(bucket, key).flatMap { unload =>
           logger.info("S3 object: {}", unload.getKey)
@@ -188,7 +259,6 @@ object Uploader extends SearchETL {
             s3Object.getDataInputStream
           Source.fromInputStream(inputStream)(codec).getLines()
         }
-      }
       case _ => throw new IllegalArgumentException(s"Invalid S3 path = '$path'")
     }
 
