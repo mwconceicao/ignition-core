@@ -21,7 +21,7 @@ trait SearchGenerators {
       score <- gScore
       viewWeight <- gViewWeight
     } yield {
-      SearchProduct(id = id, info = SearchProductInfo(purchase_weight = purchaseWeight, score = score, view_weight = viewWeight))
+      SearchProduct(id = id, info = Some(SearchProductInfo(purchase_weight = purchaseWeight, score = score, view_weight = viewWeight)))
     }
   }
 
