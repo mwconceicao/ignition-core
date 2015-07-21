@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.concurrent.{Await, ExecutionContext}
+import scala.io.Source
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
@@ -97,7 +98,8 @@ object SearchETLSetup extends SearchETL {
       logger.info("Kpis saved to dashboard!")
     }
 
-    val fSaveTopQueries = elasticSearch.serialSaveTopQueries(topQueriesResults.collect().toSeq, bulkSize = 50)
+    val defaultIndexConfig = Source.fromURL(getClass.getResource("/etl-top-queries-template.json")).mkString
+    val fSaveTopQueries = elasticSearch.saveTopQueries(topQueriesResults.collect().toIterator, defaultIndexConfig, bulkSize = 50)
     fSaveTopQueries.onComplete {
       case Success(result) =>
         logger.info(s"Top-queries saved to elastic-search! Details: $result")
