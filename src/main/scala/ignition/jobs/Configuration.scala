@@ -54,5 +54,7 @@ object Configuration {
 
   lazy val elasticSearchHost = RawConfiguration.getString("elastic-search.url")
   lazy val elasticSearchPort = RawConfiguration.getInt("elastic-search.port")
+  lazy val elasticSearchTimeoutInMinutes = RawConfiguration.getInt("elastic-search.bulk-timeout-in-minutes")
+  lazy val elasticSearchBulk = RawConfiguration.getInt("elastic-search.bulk-size")
 
 }

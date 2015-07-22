@@ -1,6 +1,7 @@
 package ignition.jobs
 
 import ignition.chaordic.pojo.{SearchClickLog, SearchEvent, SearchLog}
+import ignition.jobs.pojo.{ValidQueries, ValidQuery}
 import ignition.jobs.utils.text.{ChaordicStemmer, Tokenizer}
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
@@ -189,7 +190,7 @@ object ValidQueriesJob {
         val totalSearches = queries.map(_.searches).sum
         val totalClicks = queries.map(_.clicks).sum
         val totalResult = queries.map(_.sumResults).sum
-        ValidQueryFinal(
+        ValidQueries(
           apiKey = apiKey,
           tokens = tokens,
           topQuery = topValidQuery.query,
@@ -213,7 +214,7 @@ object ValidQueriesJob {
   def getLatestSearchLogsByKey(filteredSearchLogs: RDD[((String, String), SearchLog)]): RDD[((String, String), SearchLog)] =
     filteredSearchLogs.reduceByKey((s1, s2) => if (s1.date.isAfter(s2.date)) s1 else s2)
 
-  def process(searchLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): RDD[ValidQueryFinal] = {
+  def process(searchLogs: RDD[SearchLog], clickLogs: RDD[SearchClickLog]): RDD[ValidQueries] = {
 
     val validSearchLogs = getValidSearchLogs(searchLogs)
       .keyBy(searchLog => (searchLog.apiKey, searchLog.searchId))
@@ -246,28 +247,5 @@ object ValidQueriesJob {
     generateFinalValidQueries(biggestValidQueries)
 
   }
-
-  case class ValidQuery(apiKey: String,
-                        query: String,
-                        searches: Long,
-                        clicks: Long,
-                        rawCtr: Double,
-                        latestSearchLog: DateTime,
-                        latestSearchLogResults: Int,
-                        latestSearchLogFeature: String,
-                        sumResults: Long,
-                        averageResults: Long)
-
-  case class ValidQueryFinal(apiKey: String,
-                             tokens: Seq[String],
-                             topQuery: String,
-                             searches: Long,
-                             clicks: Long,
-                             rawCtr: Double,
-                             latestSearchLog: DateTime,
-                             latestSearchLogResults: Int,
-                             averageResults: Long,
-                             queries: Seq[ValidQuery],
-                             active: Boolean = true)
 
 }

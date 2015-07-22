@@ -3,19 +3,21 @@ package ignition.jobs.utils
 import akka.actor.ActorRefFactory
 import ignition.chaordic.Chaordic
 import ignition.chaordic.utils.Json
-import ignition.jobs.TopQueriesJob.TopQueries
-import ignition.jobs.ValidQueriesJob.ValidQueryFinal
-import ignition.jobs.setups.{TopQueriesSetup, ValidQueriesSetup}
+import ignition.jobs.pojo.{TopQueries, ValidQueries}
 import org.apache.commons.codec.digest.DigestUtils
 import org.joda.time.DateTime
+import org.slf4j.{LoggerFactory, Logger}
 import spray.client.pipelining.{SendReceive, _}
 import spray.http.ContentTypes._
 import spray.http._
 
+import scala.collection.generic.CanBuildFrom
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.io.Codec
-import scala.language.implicitConversions
+import scala.language.{higherKinds, implicitConversions, postfixOps}
+import scala.util.{Success, Try}
+import scala.util.control.NonFatal
 
 trait ElasticSearchApi {
 
@@ -25,26 +27,22 @@ trait ElasticSearchApi {
   def elasticSearchHost: String
   def elasticSearchPort: Int
 
+  private lazy val logger: Logger = LoggerFactory.getLogger(getClass)
+
   private lazy val elasticSearchUrl = s"$elasticSearchHost:$elasticSearchPort"
 
   private lazy val pipeLine: SendReceive = sendReceive
 
-  private def serialExecution[E, R](elements: Iterator[E], f: Seq[E] => Future[R], bulkSize: Int)
-                             (implicit bulkTimeout: Duration): Future[Iterator[R]] = {
-    val bulks = elements.grouped(bulkSize).map { bulk =>
-      val result = f(bulk)
-      Await.ready(result, bulkTimeout)
-    }
-    Future.sequence(bulks)
-  }
-
-  private def execute(request: HttpRequest): Future[String] =
-    pipeLine(request).flatMap { response =>
+  private def syncExecute(request: HttpRequest)(implicit timeout: Duration): Try[String] = {
+    val fResponse = pipeLine(request).flatMap { response =>
       if (response.status.isFailure)
         Future.failed(new RuntimeException(response.entity.asString))
       else
         Future.successful(response.entity.asString)
     }
+    logger.debug("Executing http operation: {}", request)
+    Try(Await.result(fResponse, timeout))
+  }
 
   private case class Document(id: String, documentType: String, json: String) {
     def indexAction(indexName: String): String =
@@ -55,82 +53,127 @@ trait ElasticSearchApi {
 
   private type RawIndexesInfo = Map[String, Map[String, Map[String, Any]]]
 
-  private def post(path: String, json: String): Future[String] =
-    execute(Post(s"$elasticSearchUrl$path", HttpEntity(`application/json`, json)))
+  private def post(path: String, json: String)(implicit timeout: Duration): Try[String] =
+    syncExecute(Post(s"$elasticSearchUrl$path", HttpEntity(`application/json`, json)))
 
-  private def get(path: String): Future[String] = execute(Get(s"$elasticSearchUrl$path"))
+  private def get(path: String)(implicit timeout: Duration): Try[String] =
+    syncExecute(Get(s"$elasticSearchUrl$path"))
 
-  private def delete(path: String): Future[String] = execute(Delete(s"$elasticSearchUrl$path"))
+  private def head(path: String)(implicit timeout: Duration): Try[String] =
+    syncExecute(Head(s"$elasticSearchUrl$path"))
+
+  private def delete(path: String)(implicit timeout: Duration): Try[String] =
+    syncExecute(Delete(s"$elasticSearchUrl$path"))
 
   private def toDocument(data: TopQueries): Document = {
     val id = DigestUtils.md5Hex(s"${data.apiKey}${data.datetime}${data.hasResult}".getBytes(Codec.UTF8.charSet))
-    val json = TopQueriesSetup.transformToJsonString(data)
+    val json = data.toRaw.toJson
     Document(id, data.apiKey, json)
   }
 
-  private def toDocument(data: ValidQueryFinal): Document = {
+  private def toDocument(data: ValidQueries): Document = {
     val id = DigestUtils.md5Hex(s"${data.apiKey},${data.topQuery}".getBytes(Codec.UTF8.charSet))
-    val json = ValidQueriesSetup.transformToJsonString(data)
+    val json = data.toRaw.toJson
     Document(id, "query", json)
   }
 
-  // FIXME
+  // copy from Future.sequence
+  object TryExtension {
+
+    def sequence[A, M[_] <: TraversableOnce[_]](in: M[Try[A]])(implicit cbf: CanBuildFrom[M[Try[A]], A, M[A]], executor: ExecutionContext): Try[M[A]] = {
+      in.foldLeft(Try(cbf(in))) {
+        (fr, fa) => for (r <- fr; a <- fa.asInstanceOf[Try[A]]) yield r += a
+      } map (_.result)
+    }
+
+  }
+
+  def indexExists(indexName: String)(implicit timeout: Duration): Boolean = head(s"/$indexName").isSuccess
+
+  def saveBulkTopQueries(jsonIndexConfig: String,  bulkSize: Int, datetime: String, bulk: Seq[TopQueries])(implicit timeout: Duration): Try[Unit] = {
+    val indexName = s"etl-top_queries-$datetime"
+    ensureIndex(indexName, jsonIndexConfig).flatMap { _ =>
+      val bulks = bulk.grouped(bulkSize)
+      val indexOperations = bulks.map(bulk => bulkIndex(indexName, bulk.map(toDocument)))
+      TryExtension.sequence(indexOperations).map(_ => ())
+    }
+  }
+
   def saveTopQueries(topQueries: Iterator[TopQueries], jsonIndexConfig: String, bulkSize: Int)
-                    (implicit timeout: Duration): Future[Iterator[String]] = {
+                    (implicit timeout: Duration): Try[Unit] = {
+    logger.info("Uploading top queries, bulk size {}", bulkSize)
     val topQueriesByDatetime = topQueries.toSeq
       .groupBy(topQuery => Chaordic.parseDate(topQuery.datetime).toString("yyyy-MM"))
       .filter { case (_, grouped) => grouped.nonEmpty }
-    Future.sequence(topQueriesByDatetime.map {
-      case (datetime, groupedTopQueries) =>
-        val indexName = s"etl-top_queries-$datetime"
-        val fIndex = createNewIndex(indexName, jsonIndexConfig)
-        fIndex.flatMap { _ =>
-          val processBulk = (bulk: Seq[TopQueries]) => bulkIndex(indexName, bulk.map(toDocument))
-          serialExecution(groupedTopQueries.toIterator, processBulk, bulkSize)
-        }
-    }).map(_.flatten.toIterator)
+
+    val bulks = topQueriesByDatetime.map {
+      case (datetime, groupedTopQueries) => saveBulkTopQueries(jsonIndexConfig, bulkSize, datetime, groupedTopQueries)
+    }
+
+    TryExtension.sequence(bulks).map(_ => ())
   }
 
-  def serialSaveValidQueries(indexName: String, validQueries: Iterator[ValidQueryFinal], bulkSize: Int)
-                            (implicit timeout: Duration): Future[Iterator[String]] =
-    serialExecution(validQueries.map(toDocument), (bulk: Seq[Document]) => bulkIndex(indexName, bulk), bulkSize)
+  def serialSaveValidQueries(indexName: String, validQueries: Iterator[ValidQueries], bulkSize: Int)
+                            (implicit timeout: Duration): Try[Unit] = {
+    TryExtension.sequence(validQueries.map(toDocument).grouped(bulkSize).map { bulk =>
+      bulkIndex(indexName, bulk)
+    }).map(_ => ())
+  }
 
-  private def createNewIndex(indexName: String, jsonIndexConfig: String): Future[String] =
+  private def createNewIndex(indexName: String, jsonIndexConfig: String)(implicit timeout: Duration): Try[String] = {
+    logger.info("Creating new index {} with config '{}'", indexName, jsonIndexConfig)
     post(s"/$indexName", jsonIndexConfig)
+  }
 
-  private def indexesInfo(): Future[Seq[IndexInfo]] = get("/_aliases").map { json =>
-    Json.parseRaw[RawIndexesInfo](json).map {
+  private def ensureIndex(indexName: String, jsonIndexConfig: String)(implicit timeout: Duration): Try[String] = {
+    logger.info("Ensuring index {}", indexName)
+    if (indexExists(indexName))
+      Success(indexName)
+    else
+      createNewIndex(indexName, jsonIndexConfig)
+  }
+
+  private def indexesInfo()(implicit timeout: Duration): Try[Seq[IndexInfo]] = get("/_aliases").map { response =>
+    Json.parseRaw[RawIndexesInfo](response).map {
       case (indexName, aliases) =>
         IndexInfo(indexName, aliases.get("aliases").map(_.keys.toSet).getOrElse(Set.empty))
     }.toSeq
   }
 
-  def saveValidQueries(validQueries: Iterator[ValidQueryFinal],
+  def saveValidQueries(validQueries: Iterator[ValidQueries],
                        jsonIndexConfig: String,
                        now: DateTime = DateTime.now,
                        aliasName: String  = "valid_queries",
                        bulk: Int = 1000)
-                      (implicit bulkTimeout: Duration) = {
+                      (implicit bulkTimeout: Duration): Try[Unit] = {
     val indexName = s"${aliasName}_${now.toString("yyyyMMdd-HHmmss")}"
+    logger.info("Uploading valid queries to index {}, reference date {}, alias name {}, bulk size {}", indexName, now.toString, aliasName, bulk.toString)
     createNewIndex(indexName, jsonIndexConfig)
-      .flatMap(_ => serialSaveValidQueries(indexName, validQueries, bulk))
-      .flatMap(_ => updateAliases(aliasName, indexName))
+      .flatMap { _ => serialSaveValidQueries(indexName, validQueries, bulk) }
+      .flatMap { _ => updateAliases(aliasName, indexName) }
   }
 
-  private def updateAliases(aliasName: String, newIndexName: String): Future[String] =
+  private def updateAliases(aliasName: String, newIndexName: String)(implicit timeout: Duration): Try[Unit] = {
     indexesInfo().flatMap { indexes =>
+      logger.info("Updating aliases to alias name '{}', new index: {}")
       val oldIndexes = indexes.filter(index => index.aliases.contains(aliasName))
       val remove = oldIndexes.map(index => Map("remove" -> Map("index" -> index.name, "alias" -> aliasName)))
       val add = Map("add" -> Map("index" -> newIndexName, "alias" -> aliasName))
       val actions = Map("actions" -> (remove :+ add))
       val json = Json.toJsonString(actions)
-      post("/_aliases", json).flatMap { response =>
-        Future.sequence(oldIndexes.map(index => delete(s"/${index.name}"))).map(_ => response)
+      logger.debug("Updating alias json request: {}", json)
+      post("/_aliases", json).flatMap { aliasResponse =>
+        logger.debug("Creating alias response: {}", aliasResponse)
+        TryExtension.sequence(oldIndexes.map { index =>
+          delete(s"/${index.name}").map(deleteResponse => logger.debug("Delete index {} response: {}", index, deleteResponse))
+        }).map(_ => ())
       }
     }
+  }
 
-  private def bulkIndex(indexName: String, documents: Seq[Document]): Future[String] = {
+  private def bulkIndex(indexName: String, documents: Seq[Document])(implicit timeout: Duration): Try[String] = {
     val bulkJson = documents.map(_.indexAction(indexName)).mkString("\n")
+    logger.info("Execution bulk for index {}", indexName)
     post("/_bulk", bulkJson)
   }
 

@@ -1,16 +1,12 @@
 package ignition.jobs
 
 import ignition.chaordic.pojo._
+import ignition.jobs.pojo.{TopQueries, QueryCount, SearchKey, QueryKey}
 import org.apache.spark.rdd.RDD
 
 object TopQueriesJob extends SearchETL {
 
   import ignition.jobs.utils.SearchEventValidations.SearchEventValidations
-
-  case class QueryCount(query: String, count: Long)
-  case class TopQueries(apiKey: String, datetime: String, hasResult: Boolean, topQueries: Seq[QueryCount])
-  case class SearchKey(apiKey: String, feature: String, searchId: String)
-  case class QueryKey(apiKey: String, datetime: String, query: String, hasResult: Boolean)
 
   private val invalidQueries = Set("pigdom")
   private val invalidIpAddresses = Set("107.170.51.250")

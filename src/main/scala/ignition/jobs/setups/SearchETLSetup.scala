@@ -44,7 +44,8 @@ object SearchETLSetup extends SearchETL {
     val allClients = executeRetrying(SearchApi.getClients())
     logger.info(s"With clients: $allClients")
 
-    val s3Prefix = s"s3n://chaordic-search-ignition-history/${config.setupName}/${config.user}/${config.tag}"
+    val s3KPIsPath = buildS3Prefix(config) + "/kpis"
+    val s3TopQueriesPath = buildS3Prefix(config) + "/top-queries"
 
     logger.info(s"Starting ETLTransaction")
 
@@ -85,31 +86,27 @@ object SearchETLSetup extends SearchETL {
       toKpi("unique_autocomplete_clicks", start, end, mainIndicatorsResults.autoCompleteUniqueClickMetrics.map(toDashPoint)))
       .repartition(numPartitions = 1).persist(StorageLevel.MEMORY_AND_DISK)
 
-    kpis.map(Json.toJson4sString).saveAsTextFile(s"$s3Prefix/kpis")
-    logger.info(s"Kpis saved to s3, path = $s3Prefix/kpis")
+    kpis.map(Json.toJson4sString).saveAsTextFile(s3KPIsPath)
+    logger.info(s"Kpis saved to s3, path = $s3KPIsPath")
 
     topQueriesResults
       .repartition(numPartitions = 1)
       .persist(StorageLevel.MEMORY_AND_DISK)
-      .saveAsTextFile(s"$s3Prefix/top-queries")
-    logger.info(s"TopQueries saved to s3, path = $s3Prefix/top-queries")
+      .saveAsTextFile(s3TopQueriesPath)
+    logger.info(s"TopQueries saved to s3, path = $s3TopQueriesPath")
+
+    val defaultIndexConfig = Source.fromURL(getClass.getResource("/etl-top-queries-template.json")).mkString
+    val indexOperation = elasticSearch.saveTopQueries(topQueriesResults.collect().toIterator, defaultIndexConfig, bulkSize = 50)
+    indexOperation match {
+      case Success(_) => logger.info(s"Top-queries saved to elastic-search!")
+      case Failure(ex) => logger.error(s"Fail to save top-queries", ex)
+    }
 
     val fSaveKpis = saveKpisToDashBoard(kpis.collect().toSeq).map { _ =>
       logger.info("Kpis saved to dashboard!")
     }
 
-    val defaultIndexConfig = Source.fromURL(getClass.getResource("/etl-top-queries-template.json")).mkString
-    val fSaveTopQueries = elasticSearch.saveTopQueries(topQueriesResults.collect().toIterator, defaultIndexConfig, bulkSize = 50)
-    fSaveTopQueries.onComplete {
-      case Success(result) =>
-        logger.info(s"Top-queries saved to elastic-search! Details: $result")
-      case Failure(exception) =>
-        logger.error("Fail to bulk index top queries", exception)
-        throw exception
-    }
-
-    val fSaveOperation = fSaveKpis.zip(fSaveTopQueries)
-    fSaveOperation.onComplete {
+    fSaveKpis.onComplete {
       case Success(_) =>
         logger.info("ETL GREAT SUCCESS =]")
       case Failure(exception) =>
@@ -117,7 +114,7 @@ object SearchETLSetup extends SearchETL {
         throw exception
     }
 
-    Await.ready(fSaveOperation, timeoutForSaveOperation)
+    Await.ready(fSaveKpis, timeoutForSaveOperation)
   }
 
 }

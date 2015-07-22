@@ -5,6 +5,7 @@ import ignition.chaordic.pojo.Parsers.{SearchClickLogParser, SearchLogParser}
 import ignition.chaordic.pojo.{SearchClickLog, SearchLog}
 import ignition.core.testsupport.spark.SharedSparkContext
 import ignition.core.utils.BetterTrace
+import ignition.jobs.pojo.{ValidQueries, ValidQuery}
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import org.scalacheck.Gen
@@ -392,7 +393,7 @@ class ValidQueriesJobSpec extends FlatSpec with ShouldMatchers with SharedSparkC
 
     val finalValidQuery = generateFinalValidQueries(biggestValidQueries)
 
-    val expectedFinalValidQuery = ValidQueryFinal(expectedValidQueries.apiKey, Seq("batman", "arkham", "ps4"),
+    val expectedFinalValidQuery = ValidQueries(expectedValidQueries.apiKey, Seq("batman", "arkham", "ps4"),
       expectedValidQueries.query, expectedValidQueries.searches, expectedValidQueries.clicks,
       expectedValidQueries.rawCtr, expectedValidQueries.latestSearchLog, expectedValidQueries.latestSearchLogResults,
       expectedValidQueries.averageResults, Seq(expectedValidQueries), active = true)

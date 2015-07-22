@@ -1,10 +1,11 @@
 package ignition.jobs.setups
 
-import ignition.chaordic.utils.Json
 import ignition.core.jobs.CoreJobRunner.RunnerContext
-import ignition.jobs.TopQueriesJob.TopQueries
-import ignition.jobs.{SearchETL, TopQueriesJob}
+import ignition.jobs.utils.uploader.Uploader
+import ignition.jobs.{Configuration, SearchETL, TopQueriesJob}
 import org.slf4j.LoggerFactory
+
+import scala.io.Source
 
 object TopQueriesSetup extends SearchETL  {
 
@@ -18,24 +19,19 @@ object TopQueriesSetup extends SearchETL  {
 
     logger.info(s"Starting TopQueriesJob for start = $start, end $now")
 
+    val s3Path = buildS3Prefix(runnerContext.config)
+
     val parsedSearchLogs = parseSearchLogs(config.setupName, sc, start = start, end = now)
     TopQueriesJob.execute(parsedSearchLogs)
       .repartition(numPartitions = 1)
-      .map(transformToJsonString)
-      .saveAsTextFile(s"s3n://chaordic-search-ignition-history/${config.setupName}/${config.user}/${config.tag}")
+      .map(_.toRaw.toJson)
+      .saveAsTextFile(s3Path)
+
+    val indexJsonConfig = Option(Source.fromURL(getClass.getResource("/etl-top-queries-template.json")).mkString)
+    Uploader.runTopQueries(s3Path, Configuration.elasticSearchHost, Configuration.elasticSearchPort,
+      Configuration.elasticSearchTimeoutInMinutes, Configuration.elasticSearchBulk, indexJsonConfig)
 
     logger.info(s"TopQueriesJob done.")
-  }
-
-  def transformToJsonString(topQueries: TopQueries): String = {
-    val topQueriesAsMap = Map(
-      "apiKey" -> topQueries.apiKey,
-      "datetime" -> topQueries.datetime,
-      "queries_has_results" -> topQueries.hasResult,
-      "event" -> "top_queries",
-      "top_queries" -> topQueries.topQueries.map(query =>
-        Map("query" -> query.query, "count" -> query.count)))
-    Json.toJsonString(topQueriesAsMap)
   }
 
 }

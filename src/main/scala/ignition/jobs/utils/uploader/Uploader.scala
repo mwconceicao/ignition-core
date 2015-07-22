@@ -1,4 +1,4 @@
-package ignition.jobs.utils
+package ignition.jobs.utils.uploader
 
 import java.io.{File, FileInputStream}
 import java.nio.file.{Files, Paths}
@@ -8,10 +8,10 @@ import java.util.zip.GZIPInputStream
 import akka.actor.ActorSystem
 import ignition.chaordic.Chaordic
 import ignition.core.utils.S3Client
-import ignition.jobs.SearchETL
+import ignition.jobs.{DashboardAPISprayJsonFormatter, SearchETL}
 import ignition.jobs.SearchETL.KpiWithDashPoint
-import ignition.jobs.TopQueriesJob.{QueryCount, TopQueries}
-import ignition.jobs.ValidQueriesJob.{ValidQuery, ValidQueryFinal}
+import ignition.jobs.pojo.{RawTopQueries, TopQueriesSprayJsonFormatter, ValidQueriesSprayJsonFormatter, RawValidQueries}
+import ignition.jobs.utils.ElasticSearchClient
 import org.joda.time.DateTime
 import org.joda.time.format.ISODateTimeFormat
 import org.slf4j.LoggerFactory
@@ -27,32 +27,11 @@ import scala.util.{Failure, Success}
 
 object Uploader extends SearchETL {
 
-  private object UploaderSprayJsonFormatter extends DefaultJsonProtocol with SprayJsonSupport {
 
-    implicit object DateTimeJsonFormat extends JsonFormat[DateTime] {
-      def write(x: DateTime) = {
-        require(x ne null)
-        JsString(ISODateTimeFormat.dateTimeNoMillis.withZoneUTC.print(x))
-      }
-      def read(value: JsValue) = value match {
-        case JsString(s) => try {
-          ISODateTimeFormat.dateTimeParser.withZoneUTC.parseDateTime(s)
-        } catch {
-          case ex: IllegalArgumentException => deserializationError("Fail to parse DateTime string: " + s, ex)
-        }
-        case s => deserializationError("Expected JsString, but got " + s)
-      }
-    }
 
-    implicit val kpiWithDashPointFormat = jsonFormat4(KpiWithDashPoint)
-    implicit val rawQueryCountFormat = jsonFormat2(RawQueryCount)
-    implicit val rawTopQueriesFormat = jsonFormat5(RawTopQueries)
-    implicit val rawValidQueryFormat = jsonFormat9(RawValidQuery)
-    implicit val rawValidQueriesFormat = jsonFormat11(RawValidQueries)
-
-  }
-
-  import UploaderSprayJsonFormatter._
+  import ValidQueriesSprayJsonFormatter._
+  import TopQueriesSprayJsonFormatter._
+  import DashboardAPISprayJsonFormatter._
   import spray.json._
 
   private lazy val s3Client = new S3Client
@@ -61,66 +40,7 @@ object Uploader extends SearchETL {
   implicit lazy val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   implicit lazy val actorSystem = ActorSystem("uploader")
 
-  private case class RawQueryCount(query: String, count: Int)
 
-  private case class RawTopQueries(apiKey: String,
-                                   datetime: String,
-                                   queries_has_results: Boolean,
-                                   event: String,
-                                   top_queries: Seq[RawQueryCount]) {
-    def convert = TopQueries(
-      apiKey = apiKey,
-      datetime = datetime,
-      hasResult = queries_has_results,
-      topQueries = top_queries.map(e => QueryCount(query = e.query, count = e.count)))
-  }
-
-  private case class RawValidQuery(raw_ctr: Double,
-                                   apiKey: String,
-                                   average_results: Long,
-                                   latest_search_log_results: Int,
-                                   latest_search_log: String,
-                                   latest_search_log_feature: String,
-                                   searchs: Long,
-                                   query: String,
-                                   clicks: Long) {
-    def convert: ValidQuery = ValidQuery(
-      apiKey = apiKey,
-      query = query,
-      searches = searchs,
-      clicks = clicks,
-      rawCtr = raw_ctr,
-      latestSearchLog = Chaordic.parseDate(latest_search_log),
-      latestSearchLogResults = latest_search_log_results,
-      latestSearchLogFeature = latest_search_log_feature,
-      sumResults = 0, // not used
-      averageResults = average_results)
-  }
-
-  private case class RawValidQueries(top_query: String,
-                                     apiKey: String,
-                                     raw_ctr: Int,
-                                     tokens: Seq[String],
-                                     latest_search_log_results: Int,
-                                     searchs: Long,
-                                     active: Boolean,
-                                     average_results: Long,
-                                     latest_search_log: String,
-                                     queries: Seq[RawValidQuery],
-                                     clicks: Long) {
-    def convert: ValidQueryFinal = ValidQueryFinal(
-      apiKey = apiKey,
-      tokens = tokens,
-      topQuery = top_query,
-      searches = searchs,
-      clicks = clicks,
-      rawCtr = raw_ctr,
-      latestSearchLog = Chaordic.parseDate(latest_search_log),
-      latestSearchLogResults = latest_search_log_results,
-      averageResults = average_results,
-      queries = queries.map(_.convert),
-      active = active)
-  }
 
   private case class UploaderConfig(eventType: String = "",
                                     path: String = "",
@@ -180,38 +100,36 @@ object Uploader extends SearchETL {
     Await.result(saveKpisToDashBoard(kpis.toSeq), Duration(timeoutInMinutes, TimeUnit.MINUTES))
   }
 
-  private def runTopQueries(path: String, server: String, port: Int, timeoutInMinutes: Int, bulkSize: Int, jsonIndexConfig: Option[String]): Unit = {
+  def runTopQueries(path: String, server: String, port: Int, timeoutInMinutes: Int, bulkSize: Int, jsonIndexConfig: Option[String]): Unit = {
     logger.info(s"Executing top-queries uploads to Elastic Search server: $server:$port")
     val timeout = Duration(timeoutInMinutes, TimeUnit.MINUTES)
     val topQueries = parseLines[RawTopQueries](getLines(path)).map(_.convert)
     val client = new ElasticSearchClient(server, port)
     val configContent = jsonIndexConfig.map(getClass.getResource).getOrElse(getClass.getResource("/etl-top-queries-template.json"))
     val indexOperation = client.saveTopQueries(topQueries, Source.fromURL(configContent).mkString, bulkSize)(timeout)
-    indexOperation.onComplete {
+    indexOperation match {
       case Success(result) =>
-        logger.info(s"Top-queries saved to elastic-search! Details: ${result.mkString}")
+        logger.info(s"Top-queries saved to elastic-search!")
       case Failure(ex) =>
         logger.error("Fail to bulk index top queries", ex)
         throw ex
     }
-    Await.result(indexOperation, timeout * topQueries.size)
   }
 
-  private def runValidQueries(path: String, server: String, port: Int, timeoutInMinutes: Int, bulkSize: Int, jsonIndexConfig: Option[String]): Unit = {
+  def runValidQueries(path: String, server: String, port: Int, timeoutInMinutes: Int, bulkSize: Int, jsonIndexConfig: Option[String]): Unit = {
     logger.info(s"Executing valid-queries uploads to Elastic Search server: $server:$port")
     val timeout = Duration(timeoutInMinutes, TimeUnit.MINUTES)
     val validQueries = parseLines[RawValidQueries](getLines(path)).map(_.convert)
     val client = new ElasticSearchClient(server, port)
     val configContent = jsonIndexConfig.map(getClass.getResource).getOrElse(getClass.getResource("/valid_queries_index_configuration.json"))
     val indexOperation = client.saveValidQueries(validQueries, Source.fromURL(configContent).mkString, bulk = bulkSize)(timeout)
-    indexOperation.onComplete {
+    indexOperation match {
       case Success(result) =>
-        logger.info(s"Valid-queries saved to elastic-search! Details: ${result.mkString}")
+        logger.info(s"Valid-queries saved to elastic-search!")
       case Failure(ex) =>
         logger.error("Fail to bulk index valid queries", ex)
         throw ex
     }
-    Await.result(indexOperation, timeout * validQueries.size)
   }
 
   private def parseLines[T](lines: Iterator[String])(implicit reader: JsonReader[T]): Iterator[T] = lines.map { line =>
@@ -260,7 +178,7 @@ object Uploader extends SearchETL {
             new GZIPInputStream(s3Object.getDataInputStream)
           else
             s3Object.getDataInputStream
-          Source.fromInputStream(inputStream)(codec).getLines().toSeq
+          Source.fromInputStream(inputStream)(codec).getLines()
         }
       case _ => throw new IllegalArgumentException(s"Invalid S3 path = '$path'")
     }
