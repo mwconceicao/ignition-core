@@ -40,8 +40,6 @@ object Uploader extends SearchETL {
   implicit lazy val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   implicit lazy val actorSystem = ActorSystem("uploader")
 
-
-
   private case class UploaderConfig(eventType: String = "",
                                     path: String = "",
                                     server: String = "",
@@ -62,10 +60,6 @@ object Uploader extends SearchETL {
       opt[Int]('b', "es-bulk-size") action { (x, c) => c.copy(bulkSize = x) }
     }
 
-    sys.addShutdownHook {
-      ec.shutdown()
-    }
-
     try {
       parser.parse(args, UploaderConfig()).foreach {
         case UploaderConfig("top-queries", path, server, port, timeoutInMinutes, bulkSize, config) if path.nonEmpty && server.nonEmpty =>
@@ -82,16 +76,14 @@ object Uploader extends SearchETL {
     } catch {
       case ex: IllegalArgumentException =>
         logger.error(ex.getMessage)
-        sys.exit(1)
 
       case NonFatal(ex) =>
         logger.error("Error", ex)
-        sys.exit(1)
     }
 
+    actorSystem.shutdown()
+    ec.shutdown()
     logger.info("done!")
-    sys.exit()
-
   }
 
   private def runKpis(path: String, timeoutInMinutes: Int): Unit = {
