@@ -147,10 +147,6 @@ object MainIndicators extends SearchETL {
    * This aggregate metrics for search (without redirects) and aggregate them yielding 1
    * for each distinct MainIndicator.
    *
-   * FIXME: Note: We have issues in the code that send metrics. Sometimes there are no searchId, and they are set
-   * to "null", the string with null inside (WTF). Because of that we need to create a hashcode for those events with
-   * null, so we don't
-   *
    * @param events List of events.
    * @tparam T Class that extends SearchEvent
    * @return
