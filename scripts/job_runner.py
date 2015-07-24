@@ -597,7 +597,17 @@ def search_etl(collect_results_dir, disable_vpc = False, security_group = defaul
              cluster_options=search_generation_cluster_options,
              disable_vpc=disable_vpc,
              security_group=security_group,
-             tag=["chaordic:role=gen.search-etl-generation"])
+             tag=["chaordic:role=gen.gen.searchetl"])
+
+def valid_queries(collect_results_dir, disable_vpc = False, security_group = default_security_group):
+    run_once(collect_results_dir,
+             "valid_queries",
+             job_name="ValidQueriesSetup",
+             cluster_name_prefix="valid-queries-generation",
+             cluster_options=search_generation_cluster_options,
+             disable_vpc=disable_vpc,
+             security_group=security_group,
+             tag=["chaordic:role=gen.validqueries"])
 
 class ExpireCollection:
     """
