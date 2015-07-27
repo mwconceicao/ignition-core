@@ -98,7 +98,7 @@ object SearchETLSetup extends SearchETL {
     val defaultIndexConfig = Source.fromURL(getClass.getResource("/etl-top-queries-template.json")).mkString
     val indexOperation = elasticSearch.saveTopQueries(topQueriesResults.collect().toIterator, defaultIndexConfig, bulkSize = 50)
     indexOperation match {
-      case Success(_) => logger.info(s"Top-queries saved to elastic-search!")
+      case Success(_) => logger.info(s"Top-queries saved to elasticsearch!")
       case Failure(ex) => logger.error(s"Fail to save top-queries", ex)
     }
 

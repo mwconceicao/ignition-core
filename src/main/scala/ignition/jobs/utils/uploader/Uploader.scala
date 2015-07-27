@@ -102,7 +102,7 @@ object Uploader extends SearchETL {
     val indexOperation = client.saveTopQueries(topQueries, Source.fromURL(configContent).mkString, bulkSize)(timeout)
     indexOperation match {
       case Success(result) =>
-        logger.info(s"Top-queries saved to elastic-search!")
+        logger.info(s"Top-queries saved to elasticsearch!")
       case Failure(ex) =>
         logger.error("Fail to bulk index top queries", ex)
         throw ex
@@ -118,7 +118,7 @@ object Uploader extends SearchETL {
     val indexOperation = client.saveValidQueries(validQueries, Source.fromURL(configContent).mkString, bulk = bulkSize)(timeout)
     indexOperation match {
       case Success(result) =>
-        logger.info(s"Valid-queries saved to elastic-search!")
+        logger.info(s"Valid-queries saved to elasticsearch!")
       case Failure(ex) =>
         logger.error("Fail to bulk index valid queries", ex)
         throw ex
