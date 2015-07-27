@@ -28,7 +28,7 @@ object TopQueriesSetup extends SearchETL  {
       .saveAsTextFile(s3Path)
 
     val indexJsonConfig = Option(Source.fromURL(getClass.getResource("/etl-top-queries-template.json")).mkString)
-    Uploader.runTopQueries(s3Path, Configuration.elasticSearchHost, Configuration.elasticSearchPort,
+    Uploader.runTopQueries(s3Path, Configuration.elasticSearchReport, Configuration.elasticSearchPort,
       Configuration.elasticSearchTimeoutInMinutes, Configuration.elasticSearchBulk, indexJsonConfig)
 
     logger.info(s"TopQueriesJob done.")

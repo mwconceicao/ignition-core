@@ -6,17 +6,12 @@ import java.util.concurrent.{Executors, TimeUnit}
 import java.util.zip.GZIPInputStream
 
 import akka.actor.ActorSystem
-import ignition.chaordic.Chaordic
 import ignition.core.utils.S3Client
-import ignition.jobs.{DashboardAPISprayJsonFormatter, SearchETL}
 import ignition.jobs.SearchETL.KpiWithDashPoint
-import ignition.jobs.pojo.{RawTopQueries, TopQueriesSprayJsonFormatter, ValidQueriesSprayJsonFormatter, RawValidQueries}
+import ignition.jobs.pojo.{RawTopQueries, RawValidQueries, TopQueriesSprayJsonFormatter, ValidQueriesSprayJsonFormatter}
 import ignition.jobs.utils.ElasticSearchClient
-import org.joda.time.DateTime
-import org.joda.time.format.ISODateTimeFormat
+import ignition.jobs.{DashboardAPISprayJsonFormatter, SearchETL}
 import org.slf4j.LoggerFactory
-import spray.httpx.SprayJsonSupport
-import spray.json._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
@@ -29,9 +24,9 @@ object Uploader extends SearchETL {
 
 
 
-  import ValidQueriesSprayJsonFormatter._
-  import TopQueriesSprayJsonFormatter._
   import DashboardAPISprayJsonFormatter._
+  import TopQueriesSprayJsonFormatter._
+  import ValidQueriesSprayJsonFormatter._
   import spray.json._
 
   private lazy val s3Client = new S3Client
@@ -39,8 +34,6 @@ object Uploader extends SearchETL {
 
   implicit lazy val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   implicit lazy val actorSystem = ActorSystem("uploader")
-
-
 
   private case class UploaderConfig(eventType: String = "",
                                     path: String = "",
@@ -170,7 +163,10 @@ object Uploader extends SearchETL {
     def linesFromS3(path: String): Iterator[String] = path match {
       case s3Pattern(bucket, key) =>
         logger.info("Loading data from S3, path: {}", path)
-        val validObjects = s3Client.list(bucket, key).filter(_.getContentLength > 0).toIterator
+        val validObjects = s3Client.list(bucket, key)
+          .filter(_.getContentLength > 0)
+          .filterNot(_.getKey contains "_temporary").toIterator
+
         validObjects.flatMap { unload =>
           logger.info("Loading S3 object: {}", unload.getKey)
           val s3Object = s3Client.readContent(bucket, unload.getKey)

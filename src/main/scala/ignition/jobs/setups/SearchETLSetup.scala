@@ -28,7 +28,7 @@ object SearchETLSetup extends SearchETL {
 
   implicit lazy val ec = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   implicit lazy val actorSystem = ActorSystem("SearchETLSetup")
-  lazy val elasticSearch = new ElasticSearchClient(Configuration.elasticSearchHost, Configuration.elasticSearchPort)
+  lazy val elasticSearch = new ElasticSearchClient(Configuration.elasticSearchReport, Configuration.elasticSearchPort)
 
   def run(runnerContext: RunnerContext) {
     val sc = runnerContext.sparkContext
