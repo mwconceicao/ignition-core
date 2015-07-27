@@ -14,6 +14,7 @@ object IgnitionBuild extends Build {
       scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xfatal-warnings"),
       // Because we can't run two spark contexts on same VM
       parallelExecution in Test := false,
+      runMain in Compile <<= Defaults.runMainTask(fullClasspath in Compile, runner in (Compile, runMain)),
       resolvers += "Cloudera Repository" at "https://repository.cloudera.com/artifactory/cloudera-repos/",
       libraryDependencies ++= Seq(
         ("org.apache.spark" %% "spark-core" % "1.3.0" % "provided").exclude("org.apache.hadoop", "hadoop-client"),

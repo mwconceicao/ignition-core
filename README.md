@@ -54,8 +54,6 @@ FIXME: You can't. Ignition Core does not support it yet.
 
 # Sometimes you have the output on S3 and you want to upload it? New cluster?
 
-## TODO: EXPLAIN UPLOADER
-
 ## Configuration
 
 You should set the proper configuration: user and password for the dashboard api, and the elasticsearch cluster name and
@@ -150,3 +148,14 @@ S3 and then sent to Elasticsearch. For detailed information check the file Valid
 # Deploy
 
 Check [search-ansible](https://github.com/chaordic/search-ansible)
+
+# Uploader
+
+- To run the Uploader cli, first you need to:
+- `git clone git@github.com:chaordic/search-ignition.git --recursive`
+- Then o upload valid queries:
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader valid-queries s3://<bucket>/<path to folder with valid-queries part_* data> -s http://<elastichsearch server> -p 9200"`
+- Or to upload top queries:
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader top-queries s3://<bucket>/<path to folder with top-queries part_* data> -s http://<elastichsearch server> -p 9200"`
+- Or to upload KPI:
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader kpi s3://<bucket>/<path to folder with kpi part_* data>"`
