@@ -25,8 +25,8 @@ object MainIndicatorsSetup extends SearchETL {
     val sc = runnerContext.sparkContext
     val config = runnerContext.config
 
-    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(6).withTimeAtStartOfDay())
-    val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.withTime(23, 59, 59, 999))
+    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(1).withTimeAtStartOfDay())
+    val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.minusDays(1).withTime(23, 59, 59, 999))
 
     val timeoutSaveOperation: FiniteDuration = 30 minutes
 

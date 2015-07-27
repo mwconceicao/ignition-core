@@ -16,12 +16,13 @@ object TopQueriesSetup extends SearchETL  {
     val config = runnerContext.config
     val now = runnerContext.config.date
     val start = now.minusDays(1).withTimeAtStartOfDay()
+    val end = config.date.minusDays(1).withTime(23, 59, 59, 999)
 
     logger.info(s"Starting TopQueriesJob for start = $start, end $now")
 
     val s3Path = buildS3Prefix(runnerContext.config)
 
-    val parsedSearchLogs = parseSearchLogs(config.setupName, sc, start = start, end = now)
+    val parsedSearchLogs = parseSearchLogs(config.setupName, sc, start = start, end = end)
     TopQueriesJob.execute(parsedSearchLogs)
       .repartition(numPartitions = 1)
       .map(_.toRaw.toJson)
