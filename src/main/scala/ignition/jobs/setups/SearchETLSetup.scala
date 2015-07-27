@@ -90,6 +90,7 @@ object SearchETLSetup extends SearchETL {
     logger.info(s"Kpis saved to s3, path = $s3KPIsPath")
 
     topQueriesResults
+      .map(_.toRaw.toJson)
       .repartition(numPartitions = 1)
       .persist(StorageLevel.MEMORY_AND_DISK)
       .saveAsTextFile(s3TopQueriesPath)

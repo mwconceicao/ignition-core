@@ -93,6 +93,7 @@ object Uploader extends SearchETL {
     val topQueries = parseLines[RawTopQueries](getLines(path)).map(_.convert)
     val client = new ElasticSearchClient(server, port)
     val configContent = jsonIndexConfig.map(getClass.getResource).getOrElse(getClass.getResource("/etl-top-queries-template.json"))
+
     val indexOperation = client.saveTopQueries(topQueries, Source.fromURL(configContent).mkString, bulkSize)(timeout)
     indexOperation match {
       case Success(result) =>

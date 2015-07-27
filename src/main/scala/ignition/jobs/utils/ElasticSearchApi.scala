@@ -120,9 +120,23 @@ trait ElasticSearchApi {
     }).map(_ => ())
   }
 
+  private def setTemplate(templateConfig: String)(implicit timeout:Duration): Try[String] = {
+    logger.info("Setting template: {}", templateConfig)
+    val templateName = "top_query_template"
+
+    if (!templateExists(templateName))
+      post(s"/_template/$templateName", templateConfig)
+    else
+      Success("yey")
+  }
+
   private def createNewIndex(indexName: String, jsonIndexConfig: String)(implicit timeout: Duration): Try[String] = {
     logger.info("Creating new index {} with config '{}'", indexName, jsonIndexConfig)
     post(s"/$indexName", jsonIndexConfig)
+  }
+
+  private def templateExists(templateName: String)(implicit timeout: Duration): Boolean = {
+    head(s"/_template/$templateName").isSuccess
   }
 
   private def ensureIndex(indexName: String, jsonIndexConfig: String)(implicit timeout: Duration): Try[String] = {
@@ -130,7 +144,7 @@ trait ElasticSearchApi {
     if (indexExists(indexName))
       Success(indexName)
     else
-      createNewIndex(indexName, jsonIndexConfig)
+      setTemplate(jsonIndexConfig)
   }
 
   private def indexesInfo()(implicit timeout: Duration): Try[Seq[IndexInfo]] = get("/_aliases").map { response =>

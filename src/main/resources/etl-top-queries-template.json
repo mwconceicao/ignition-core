@@ -1,4 +1,5 @@
 {
+    "template": "etl-top_queries-*",
     "mappings": {
         "_default_": {
             "properties": {
