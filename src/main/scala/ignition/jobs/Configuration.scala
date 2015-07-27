@@ -52,9 +52,10 @@ object Configuration {
   lazy val dashboardApiUser = RawConfiguration.getString("dashboard-api.user")
   lazy val dashboardApiPassword = RawConfiguration.getString("dashboard-api.password")
 
-  lazy val elasticSearchHost = RawConfiguration.getString("elastic-search.url")
-  lazy val elasticSearchPort = RawConfiguration.getInt("elastic-search.port")
-  lazy val elasticSearchTimeoutInMinutes = RawConfiguration.getInt("elastic-search.bulk-timeout-in-minutes")
-  lazy val elasticSearchBulk = RawConfiguration.getInt("elastic-search.bulk-size")
+  lazy val elasticSearchAPI = RawConfiguration.getString("elasticsearch.api")
+  lazy val elasticSearchReport = RawConfiguration.getString("elasticsearch.report")
+  lazy val elasticSearchPort = RawConfiguration.getInt("elasticsearch.port")
+  lazy val elasticSearchTimeoutInMinutes = RawConfiguration.getInt("elasticsearch.bulk-timeout-in-minutes")
+  lazy val elasticSearchBulk = RawConfiguration.getInt("elasticsearch.bulk-size")
 
 }
