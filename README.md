@@ -1,5 +1,7 @@
 # Search-Ignition
 
+![Build](https://circleci.com/gh/chaordic/search-ignition.png?circle-token=2e76bc0bbe40f8c3deeb24895ffc687a39e10deb)
+
 This project provides all the jobs necessary for the Search Product.
 
 Jobs Available:
