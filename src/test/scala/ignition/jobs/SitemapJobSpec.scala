@@ -1,16 +1,15 @@
 package ignition.jobs
 
-import ignition.chaordic.Chaordic
-import ignition.chaordic.pojo.Parsers.ProductV2Parser
+import ignition.chaordic.pojo.Parsers.{SearchClickLogParser, ProductV2Parser, SearchLogParser}
 import ignition.core.testsupport.spark.SharedSparkContext
 import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.joda.time.DateTime
-import org.scalatest.{ShouldMatchers, FlatSpec}
+import org.scalatest.{FlatSpec, ShouldMatchers}
 
 class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContext {
 
   val p =
-    (new ProductV2Parser()).from("""
+    new ProductV2Parser().from("""
                                    |{
                                    |  "version": "V2",
                                    |  "tags": [
@@ -128,7 +127,7 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContex
     """
       |{"apiKey":"saraiva-v5","pageSize":48,"totalFound":0,"userId":"anon-34a6d2f4-080a-11e5-9fc8-024ce8a621bb","filters":null,"date":"2015-06-01T00:00:04.090027","query":"estante home","info":{"searchId":"66ecf418-b15a-4d8d-9a55-c759d1dd1ef8","resultsExpansion":true,"ip":"66.249.64.146","personalizeResults":false,"realUserId":null,"queryTime":17,"relatedQuery":null,"sesssion":null,"chaordic_testGroup":null,"hasSynonyms":false,"browser_family":"Googlebot","forceOriginal":false},"feature":"standard","page":1,"products":[{"info":{"purchase_weight":0,"score":3.043074,"view_weight":0},"id":"22578"},{"info":{"purchase_weight":0,"score":3.043074,"view_weight":0},"id":"68774"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.3353748,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.3978953,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":2.5505974,"view_weight":0},"id":"22578"},{"info":{"purchase_weight":0,"score":2.5505974,"view_weight":0},"id":"68774"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.1102133,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.5257285,"view_weight":0},"id":"127209"}],"order":null}
     """.stripMargin
-  ).map(SearchLogParser.from)
+  ).map(new SearchLogParser().from)
 
   val config = SitemapConfig(host = "myhost", generatePages = true, generateSearch = true, details = Set("detailField1"), useDetails = true, maxSearchItems = 100, numberPartFiles = 3)
 
@@ -136,7 +135,7 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContex
     """
       |{"apiKey":"saraiva-v5","userId":null,"paginationInfo":{"pageIndex":0,"itemIndex":0,"pageItems":45},"anonymous":true,"date":"2015-06-01T00:00:00.231446","query":"watchman","info":{"requestExpansion":false,"searchId":"f2ec02a2-e820-41c7-84fa-da03611f5039","sesssion":null,"chaordic_testGroup":null,"url":"http://www.saraiva.com.br/o-jardim-secreto-336062.html","ip":"66.249.64.133","realUserId":null,"browser_family":"Googlebot"},"feature":"search","version":"V2","products":[{"sku":null,"price":34.0,"id":"336062"}],"type":"clicklog","page":"search","interactionType":"PRODUCT_DETAILS"}
     """.stripMargin
-  ).map(SearchClickLogParser.from)
+  ).map(new SearchClickLogParser().from)
 
   "Search" should "create link for product based on *categories" in {
     // Note: ignoring details for now because its semantics will change soon

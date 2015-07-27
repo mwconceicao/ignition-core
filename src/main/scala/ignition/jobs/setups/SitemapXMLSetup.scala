@@ -1,17 +1,16 @@
 package ignition.jobs.setups
 
 import ignition.chaordic.Chaordic
-import ignition.chaordic.pojo.Parsers.{ProductV1Parser, ProductV2Parser}
-import ignition.chaordic.pojo.Product
+import ignition.chaordic.pojo.Parsers.{ProductV1Parser, ProductV2Parser, SearchClickLogParser, SearchLogParser}
+import ignition.chaordic.pojo.{Product, SearchClickLog, SearchLog}
 import ignition.chaordic.utils.ChaordicPathDateExtractor._
-import ignition.chaordic.utils.JobConfiguration
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.core.jobs.ExecutionRetry
 import ignition.core.jobs.utils.SparkContextUtils._
 import ignition.core.utils.DateUtils._
 import ignition.core.utils.S3Client
 import ignition.jobs._
-import ignition.jobs.utils.SearchApi
+import ignition.jobs.utils.{EntitiesLayer, SearchApi}
 import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.rdd.RDD
@@ -20,7 +19,7 @@ import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
 import scala.util.control.NonFatal
-import scala.util.{Failure, Try, Success}
+import scala.util.{Failure, Success, Try}
 import scala.xml.Elem
 
 
@@ -28,24 +27,16 @@ object SitemapXMLSetup extends ExecutionRetry {
 
   private lazy val logger = LoggerFactory.getLogger("ignition.SitemapXMLSetup")
 
-
   def parseProducts(rdd: RDD[String]): RDD[Product] = rdd.map { line =>
     Chaordic.parseWith(line, new ProductV1Parser, new ProductV2Parser)
   }.collect { case Success(v) => v.fold(identity, identity) }
-
-  def parseSearchLogs(rdd: RDD[String]): RDD[SearchLog] = rdd.map { line =>
-    Chaordic.parseWith(line, SearchLogParser)
-  }.collect { case Success(v) => v }
-
-  def parseSearchClickLogs(rdd: RDD[String]): RDD[SearchClickLog] = rdd.map { line =>
-    Chaordic.parseWith(line, SearchClickLogParser)
-  }.collect { case Success(v) => v }
 
   def run(runnerContext: RunnerContext) {
 
     val sc = runnerContext.sparkContext
     val config = runnerContext.config
     val now = runnerContext.config.date
+    val setupName = config.setupName
 
     val productionUser = "root"
     val jobOutputBucket = "chaordic-search-ignition-history"
@@ -75,14 +66,16 @@ object SitemapXMLSetup extends ExecutionRetry {
 
     logger.info(s"Do we need search logs? $willNeedSearch")
     val parsedClickLogs = if (willNeedSearch)
-      parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
-        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist(StorageLevel.MEMORY_AND_DISK)
+      EntitiesLayer.parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
+        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay())), setupName)
+        .persist(StorageLevel.MEMORY_AND_DISK)
     else
       sc.emptyRDD[SearchClickLog]
 
     val parsedSearchLogs = if (willNeedSearch)
-      parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
-        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay()))).persist(StorageLevel.MEMORY_AND_DISK)
+      EntitiesLayer.parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
+        endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay())), setupName)
+        .persist(StorageLevel.MEMORY_AND_DISK)
     else
       sc.emptyRDD[SearchLog]
 

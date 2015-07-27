@@ -1,0 +1,46 @@
+{
+  "settings": {
+    "index":{
+      "analysis": {
+        "filter":{
+          "stemmer_minimal_pt": {
+            "type": "stemmer",
+            "language": "minimal_portuguese"
+          }
+        },
+        "analyzer": {
+          "html_flex_analyzer": {
+            "type": "custom",
+            "char_filter": [
+              "html_strip"
+            ],
+            "tokenizer": "standard",
+            "filter": [
+              "standard",
+              "lowercase",
+              "asciifolding"
+            ]
+          }
+        }
+      }
+    }
+  },
+
+  "mappings": {
+    "query": {
+      "_timestamp" : { "enabled" : true , "store": true},
+      "properties": {
+        "apiKey": {
+          "type": "string",
+          "index": "not_analyzed"
+        },
+        "top_query":{
+          "type": "string",
+          "index_analyzer": "html_flex_analyzer",
+          "search_analyzer": "html_flex_analyzer"
+        }
+
+      }
+    }
+  }
+}

@@ -3,7 +3,7 @@ package ignition.jobs
 import java.net.URLEncoder
 
 import ignition.chaordic.JsonParser
-import ignition.chaordic.pojo.Product
+import ignition.chaordic.pojo.{SearchClickLog, SearchLog, Product}
 import ignition.chaordic.utils.Json
 import ignition.core.utils.DateUtils._
 import ignition.jobs.SitemapXMLJob._
@@ -11,32 +11,6 @@ import ignition.jobs.utils.SearchApi.SitemapConfig
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
-
-case class SearchProductInfo(purchase_weight: Double, score: Double, view_weight: Double)
-case class SearchProduct(info: SearchProductInfo, id: String)
-
-case class SearchLog(apiKey: String, date: String, feature: String, filters: Option[Map[String, List[String]]],
-                     order: String, page: Int, pageSize: Int, products: List[SearchProduct], query: String,
-                     totalFound: Int, userId: String)
-
-
-case class SearchClickLog(apiKey: String, userId:String, query: String, feature: String)
-
-
-object SearchLogParser extends JsonParser[SearchLog] {
-  override def from(jsonStr: String): SearchLog = {
-    import Json.formats
-    Json.parseJson4s(jsonStr).extract[SearchLog]
-  }
-}
-
-
-object SearchClickLogParser extends JsonParser[SearchClickLog] {
-  override def from(jsonStr: String): SearchClickLog = {
-    import Json.formats
-    Json.parseJson4s(jsonStr).extract[SearchClickLog]
-  }
-}
 
 
 object SitemapXMLJob {

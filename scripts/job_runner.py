@@ -123,25 +123,25 @@ log.addFilter(ContextFilter())
 
 ## Cluster Configuration
 
-sitemap_generation_cluster_budget = 0.26 * 2 * 3 * 1.2 * 2
-sitemap_generation_cluster_options = [
-    ClusterConf('r3.8xlarge', sitemap_generation_cluster_budget, 1, '1', '8', '15G', 'hvm'),
-    ClusterConf('r3.4xlarge', sitemap_generation_cluster_budget, 1, '1', '4', '15G', 'hvm'),
-    ClusterConf('r3.2xlarge', sitemap_generation_cluster_budget, 1, '2', '2', '15G', 'hvm'),
-    ClusterConf('r3.xlarge', sitemap_generation_cluster_budget, 1, '4', '1', '15G', 'hvm'),
+search_generation_cluster_budget = 0.26 * 2 * 3 * 1.2 * 2
+search_generation_cluster_options = [
+    ClusterConf('r3.8xlarge', search_generation_cluster_budget, 1, '1', '8', '15G', 'hvm'),
+    ClusterConf('r3.4xlarge', search_generation_cluster_budget, 1, '1', '4', '15G', 'hvm'),
+    ClusterConf('r3.2xlarge', search_generation_cluster_budget, 1, '2', '2', '15G', 'hvm'),
+    ClusterConf('r3.xlarge', search_generation_cluster_budget, 1, '4', '1', '15G', 'hvm'),
 
-    ClusterConf('d2.8xlarge', sitemap_generation_cluster_budget, 0.8, '1', '8', '15G', 'hvm'),
-    ClusterConf('d2.4xlarge', sitemap_generation_cluster_budget, 0.8, '1', '4', '15G', 'hvm'),
-    ClusterConf('d2.2xlarge', sitemap_generation_cluster_budget, 0.8, '2', '2', '15G', 'hvm'),
-    ClusterConf('d2.xlarge', sitemap_generation_cluster_budget, 0.8, '4', '1', '15G', 'hvm'),
+    ClusterConf('d2.8xlarge', search_generation_cluster_budget, 0.8, '1', '8', '15G', 'hvm'),
+    ClusterConf('d2.4xlarge', search_generation_cluster_budget, 0.8, '1', '4', '15G', 'hvm'),
+    ClusterConf('d2.2xlarge', search_generation_cluster_budget, 0.8, '2', '2', '15G', 'hvm'),
+    ClusterConf('d2.xlarge', search_generation_cluster_budget, 0.8, '4', '1', '15G', 'hvm'),
 
-    ClusterConf('c3.8xlarge', sitemap_generation_cluster_budget, 0.7, '1', '3', '15G', 'hvm'),
-    ClusterConf('c3.4xlarge', sitemap_generation_cluster_budget, 0.7, '2', '1', '15G', 'hvm'),
-    ClusterConf('c3.2xlarge', sitemap_generation_cluster_budget, 0.7, '4', '1', '7G', 'hvm'),
+    ClusterConf('c3.8xlarge', search_generation_cluster_budget, 0.7, '1', '3', '15G', 'hvm'),
+    ClusterConf('c3.4xlarge', search_generation_cluster_budget, 0.7, '2', '1', '15G', 'hvm'),
+    ClusterConf('c3.2xlarge', search_generation_cluster_budget, 0.7, '4', '1', '7G', 'hvm'),
 
-    ClusterConf('hi1.4xlarge', sitemap_generation_cluster_budget, 0.6, '4', '2', '15G', 'hvm'),
+    ClusterConf('hi1.4xlarge', search_generation_cluster_budget, 0.6, '4', '2', '15G', 'hvm'),
 
-    ClusterConf('cc2.8xlarge', sitemap_generation_cluster_budget, 0.6, '2', '2', '15G', 'hvm'),
+    ClusterConf('cc2.8xlarge', search_generation_cluster_budget, 0.6, '2', '2', '15G', 'hvm'),
 ]
 
 
@@ -583,11 +583,31 @@ def sitemap_generation(collect_results_dir, disable_vpc = False, security_group 
             "sitemaps",
              job_name="SitemapXMLSetup",
              cluster_name_prefix="sitemap-generation",
-             cluster_options=sitemap_generation_cluster_options,
+             cluster_options=search_generation_cluster_options,
              disable_vpc=disable_vpc,
              security_group=security_group,
              tag=["chaordic:role=gen.sitemap"])
 
+
+def search_etl(collect_results_dir, disable_vpc = False, security_group = default_security_group):
+    run_once(collect_results_dir,
+             "search_etl",
+             job_name="SearchETLSetup",
+             cluster_name_prefix="search-etl-generation",
+             cluster_options=search_generation_cluster_options,
+             disable_vpc=disable_vpc,
+             security_group=security_group,
+             tag=["chaordic:role=gen.gen.searchetl"])
+
+def valid_queries(collect_results_dir, disable_vpc = False, security_group = default_security_group):
+    run_once(collect_results_dir,
+             "valid_queries",
+             job_name="ValidQueriesSetup",
+             cluster_name_prefix="valid-queries-generation",
+             cluster_options=search_generation_cluster_options,
+             disable_vpc=disable_vpc,
+             security_group=security_group,
+             tag=["chaordic:role=gen.validqueries"])
 
 class ExpireCollection:
     """
@@ -637,5 +657,5 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
     parser = ArghParser()
-    parser.add_commands([sitemap_generation])
+    parser.add_commands([sitemap_generation, transaction_etl])
     parser.dispatch()
