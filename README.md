@@ -75,10 +75,12 @@ dashboard-api {
   url = "https://dashboard-api.chaordicsystems.com"
 }
 
-elastic-search {
-  cluster-name = ""
-  url = ""
-  port= 9200
+elasticsearch {
+  report = ""
+  api = ""
+  port = 9200
+  bulk-timeout-in-minutes = 15
+  bulk-size = 500  
 }
 ```
 
