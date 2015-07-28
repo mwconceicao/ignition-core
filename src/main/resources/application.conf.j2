@@ -6,14 +6,14 @@ akka {
 }
 
 dashboard-api {
-  user = ""
-  password = ""
-  url = "https://dashboard-api.chaordicsystems.com"
+  user = "{{ dashboard_api_user }}"
+  password = "{{ dashboard_api_password }}"
+  url = "{{ dashboard_api_url }}"
 }
 
 elasticsearch {
-  report = "192.168.59.103"
-  api = "192.168.59.103"
+  report = "{{ elasticsearch_report }}"
+  api = "{{ elasticsearch_api }}"
   port = 9200
   bulk-timeout-in-minutes = 15
   bulk-size = 500
