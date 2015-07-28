@@ -8,4 +8,4 @@ mkdir -p $RESULTS_DIR
 export LANG=C
 export LC_ALL=C
 
-nohup $IGNITION_HOME/scripts/job_runner.py search-etl-generation $RESULTS_DIR >& $LOG_DIR/search-etl-generation_job_runner.log &
+nohup $IGNITION_HOME/scripts/job_runner.py search_etl $RESULTS_DIR >& $LOG_DIR/search_etl_job_runner.log &
