@@ -10,4 +10,4 @@ export LC_ALL=C
 
 #Force assembly rebuild
 rm -rf $IGNITION_HOME/target
-nohup $IGNITION_HOME/scripts/job_runner.py search-etl-generation $RESULTS_DIR >& $LOG_DIR/search-etl-generation_job_runner.log &
+nohup $IGNITION_HOME/scripts/job_runner.py search-etl $RESULTS_DIR >& $LOG_DIR/search_etl_job_runner.log &

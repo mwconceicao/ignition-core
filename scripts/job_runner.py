@@ -657,5 +657,5 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
     parser = ArghParser()
-    parser.add_commands([sitemap_generation, transaction_etl])
+    parser.add_commands([sitemap_generation, search_etl, valid_queries])
     parser.dispatch()
