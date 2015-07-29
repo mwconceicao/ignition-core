@@ -25,12 +25,14 @@ object ValidQueriesSetup extends SearchETL {
     val parsedSearchLogs = parseSearchLogs(config.setupName, sc, start = start, end = now).persist(StorageLevel.MEMORY_AND_DISK)
     val parsedClickLogs = parseClickLogs(config.setupName, sc, start = start, end = now).persist(StorageLevel.MEMORY_AND_DISK)
 
-    val s3Path = buildS3Prefix(config)
+    val s3NPath = buildS3Prefix(config)
+
+    val s3Path = s3NPath.replace("s3n://", "s3://")
 
     ValidQueriesJob.process(parsedSearchLogs, parsedClickLogs)
       .map(_.toRaw.toJson)
       .coalesce(20)
-      .saveAsTextFile(s3Path)
+      .saveAsTextFile(s3NPath)
 
     val indexJsonConfig = Option(Source.fromURL(getClass.getResource("/valid_queries_index_configuration.json")).mkString)
     Uploader.runValidQueries(s3Path, Configuration.elasticSearchAPI, Configuration.elasticSearchPort,
