@@ -144,6 +144,25 @@ search_generation_cluster_options = [
     ClusterConf('cc2.8xlarge', search_generation_cluster_budget, 0.6, '2', '2', '15G', 'hvm'),
 ]
 
+valid_queries_cluster_budget = 0.26 * 2 * 3 * 1.2 * 2
+valid_queries_generation_cluster_options = [
+    ClusterConf('r3.8xlarge', valid_queries_cluster_budget, 1, '2', '8', '15G', 'hvm'),
+    ClusterConf('r3.4xlarge', valid_queries_cluster_budget, 1, '4', '4', '15G', 'hvm'),
+    ClusterConf('r3.2xlarge', valid_queries_cluster_budget, 1, '7', '2', '15G', 'hvm'),
+    ClusterConf('r3.xlarge', valid_queries_cluster_budget, 1, '14', '1', '15G', 'hvm'),
+
+    ClusterConf('d2.8xlarge', valid_queries_cluster_budget, 0.8, '2', '8', '15G', 'hvm'),
+    ClusterConf('d2.4xlarge', valid_queries_cluster_budget, 0.8, '4', '4', '15G', 'hvm'),
+    ClusterConf('d2.2xlarge', valid_queries_cluster_budget, 0.8, '8', '2', '15G', 'hvm'),
+    ClusterConf('d2.xlarge', valid_queries_cluster_budget, 0.8, '16', '1', '15G', 'hvm'),
+
+    ClusterConf('c3.8xlarge', valid_queries_cluster_budget, 0.7, '4', '3', '15G', 'hvm'),
+    ClusterConf('c3.4xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '20G', 'hvm'),
+
+    ClusterConf('hi1.4xlarge', valid_queries_cluster_budget, 0.6, '8', '2', '15G', 'hvm'),
+
+    ClusterConf('cc2.8xlarge', valid_queries_cluster_budget, 0.6, '4', '2', '15G', 'hvm'),
+]
 
 def send_heartbeat(retries=3):
     for i in range(retries):
@@ -604,7 +623,7 @@ def valid_queries(collect_results_dir, disable_vpc = False, security_group = def
              "valid_queries",
              job_name="ValidQueriesSetup",
              cluster_name_prefix="valid-queries-generation",
-             cluster_options=search_generation_cluster_options,
+             cluster_options=valid_queries_generation_cluster_options,
              disable_vpc=disable_vpc,
              security_group=security_group,
              tag=["chaordic:role=gen.validqueries"])
