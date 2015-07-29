@@ -29,7 +29,9 @@ trait ElasticSearchApi {
 
   private lazy val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  private lazy val elasticSearchUrl = s"$elasticSearchHost:$elasticSearchPort"
+  private lazy val elasticSearchUrl =
+    if (elasticSearchHost.startsWith("http")) s"$elasticSearchHost:$elasticSearchPort"
+    else s"http://$elasticSearchHost:$elasticSearchPort"
 
   private lazy val pipeLine: SendReceive = sendReceive
 
