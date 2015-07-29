@@ -100,7 +100,9 @@ object SearchETLSetup extends SearchETL {
     val indexOperation = elasticSearch.saveTopQueries(topQueriesResults.collect().toIterator, defaultIndexConfig, bulkSize = 50)
     indexOperation match {
       case Success(_) => logger.info(s"Top-queries saved to elasticsearch!")
-      case Failure(ex) => logger.error(s"Fail to save top-queries", ex)
+      case Failure(ex) =>
+        logger.error(s"Fail to save top-queries", ex)
+        throw ex
     }
 
     val fSaveKpis = saveKpisToDashBoard(kpis.collect().toSeq).map { _ =>
