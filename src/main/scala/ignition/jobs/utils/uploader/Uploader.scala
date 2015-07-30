@@ -96,7 +96,7 @@ object Uploader extends SearchETL {
         }
 
         case UploaderConfig("valid-queries", path, server, port, timeoutInMinutes, bulkSize, config) if server.nonEmpty => {
-          runValidQueries(path.getOrElse(s3Client.getLatestOutput("chaordic-search-ignition-history", "ValidQueriesSetup/root", "valid-queries")), server, port, timeoutInMinutes, bulkSize, config)
+          runValidQueries(path.getOrElse(s3Client.getLatestOutput("chaordic-search-ignition-history", "ValidQueriesSetup/root", "")), server, port, timeoutInMinutes, bulkSize, config)
         }
 
         case UploaderConfig("kpi", path, _, _, _, timeoutInMinutes, _) =>  {
