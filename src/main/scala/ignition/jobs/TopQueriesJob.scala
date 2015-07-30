@@ -69,7 +69,7 @@ object TopQueriesJob extends SearchETL {
 
     rawTopQueries.map {
       case ((apiKey, datetime, hasResult), queries) =>
-        val topQueries = queries.toSeq.sortBy(_.count).reverse.take(100)
+        val topQueries = queries.toSeq.sortBy(_.count).reverse.take(1000)
         TopQueries(apiKey = apiKey, datetime = datetime, hasResult = hasResult, topQueries = topQueries)
     }
   }
