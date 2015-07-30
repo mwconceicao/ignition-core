@@ -70,13 +70,12 @@ object Uploader extends SearchETL {
   implicit lazy val actorSystem = ActorSystem("uploader")
 
   private case class UploaderConfig(eventType: String = "",
-                                    path: String = "",
+                                    path: Option[String] = None,
                                     server: String = "",
                                     port: Int = 9200,
                                     bulkTimeoutInMinutes: Int = 5,
                                     bulkSize: Int = 50,
-                                    validQueriesIndexConfigPath: Option[String] = None,
-                                    latestPathPrefix: String = "")
+                                    validQueriesIndexConfigPath: Option[String] = None)
 
   def main (args: Array[String]) {
     val parser = new scopt.OptionParser[UploaderConfig]("Uploader") {
@@ -87,41 +86,22 @@ object Uploader extends SearchETL {
       opt[Int]('p', "es-port") action { (x, c) => c.copy(port = x) }
       opt[Int]('t', "es-save-timeout-minutes-per-bulk") action { (x, c) => c.copy(bulkTimeoutInMinutes = x) }
       opt[Int]('b', "es-bulk-size") action { (x, c) => c.copy(bulkSize = x) }
-      opt[String]('k', "s3-key") action { (x, c) => c.copy(path = x) } text "can be dir or file from 's3://<bucket>/<key>' or '/local/file/system'"
-      opt[String]('l', "base-path") action { (x, c) => c.copy(latestPathPrefix = x) } text "Given a s3 location 's3://<bucket>/<key>' that contains job outputs, use the latest successful job output"
+      opt[String]('k', "s3-key") action { (x, c) => c.copy(path = Some(x)) } text "can be dir or file from 's3://<bucket>/<key>' or '/local/file/system'"
     }
-
-
 
     try {
       parser.parse(args, UploaderConfig()).foreach {
-        case UploaderConfig("top-queries", path, server, port, timeoutInMinutes, bulkSize, config, latestPathPrefix) if server.nonEmpty => {
-          if (latestPathPrefix == "" && path.nonEmpty)
-            runTopQueries(path, server, port, timeoutInMinutes, bulkSize, config)
-          else {
-            val latestPath = s3Client.getLatestOutput("chaordic-search-ignition-history", "SearchETLSetup/root", "top-queries")
-            runTopQueries(latestPath, server, port, timeoutInMinutes, bulkSize, config)
-          }
+        case UploaderConfig("top-queries", path, server, port, timeoutInMinutes, bulkSize, config) if server.nonEmpty => {
+          runTopQueries(path.getOrElse(s3Client.getLatestOutput("chaordic-search-ignition-history", "SearchETLSetup/root", "top-queries")), server, port, timeoutInMinutes, bulkSize, config)
         }
 
-        case UploaderConfig("valid-queries", path, server, port, timeoutInMinutes, bulkSize, config, latestPathPrefix) if server.nonEmpty => {
-          if (latestPathPrefix == "" && path.nonEmpty)
-            runValidQueries(path, server, port, timeoutInMinutes, bulkSize, config)
-          else {
-            val latestPath = s3Client.getLatestOutput("chaordic-search-ignition-history", "ValidQueriesSetup/root", "valid-queries")
-            runValidQueries(latestPath, server, port, timeoutInMinutes, bulkSize, config)
-          }
+        case UploaderConfig("valid-queries", path, server, port, timeoutInMinutes, bulkSize, config) if server.nonEmpty => {
+          runValidQueries(path.getOrElse(s3Client.getLatestOutput("chaordic-search-ignition-history", "ValidQueriesSetup/root", "valid-queries")), server, port, timeoutInMinutes, bulkSize, config)
         }
 
-        case UploaderConfig("kpi", path, _, _, _, timeoutInMinutes, _, latestPathPrefix) =>
-          {
-            if (latestPathPrefix == "" && path.nonEmpty)
-              runKpis(path, timeoutInMinutes)
-            else {
-              val latestPath = s3Client.getLatestOutput("chaordic-search-ignition-history", "SearchETLSetup/root", "kpi")
-              runKpis(latestPath, timeoutInMinutes)
-            }
-          }
+        case UploaderConfig("kpi", path, _, _, _, timeoutInMinutes, _) =>  {
+          runKpis(path.getOrElse(s3Client.getLatestOutput("chaordic-search-ignition-history", "SearchETLSetup/root", "kpi")), timeoutInMinutes)
+        }
 
         case runConfig => {
           throw new IllegalArgumentException(s"Invalid parameters: $runConfig")
