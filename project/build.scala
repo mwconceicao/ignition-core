@@ -11,6 +11,7 @@ object IgnitionBuild extends Build {
       name := "search-ignition",
       version := "1.0",
       scalaVersion := "2.10.4",
+      fork := true,
       scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Xfatal-warnings"),
       // Because we can't run two spark contexts on same VM
       parallelExecution in Test := false,
