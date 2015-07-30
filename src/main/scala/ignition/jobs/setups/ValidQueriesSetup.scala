@@ -34,9 +34,6 @@ object ValidQueriesSetup extends SearchETL {
       .coalesce(20)
       .saveAsTextFile(s3NPath)
 
-    val indexJsonConfig = Option(Source.fromURL(getClass.getResource("/valid_queries_index_configuration.json")).mkString)
-    Uploader.runValidQueries(s3Path, Configuration.elasticSearchAPI, Configuration.elasticSearchPort,
-      Configuration.elasticSearchTimeoutInMinutes, Configuration.elasticSearchBulk, indexJsonConfig)
   }
 
 }
