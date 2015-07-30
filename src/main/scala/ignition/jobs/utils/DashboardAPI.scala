@@ -119,7 +119,7 @@ object DashboardAPI extends DashboardApikeyConversion{
       if (response.status.isSuccess)
         Future.successful()
       else
-        Future.failed(new RuntimeException(s"Fail to cleanup metrics for product = $product, kpi = $kpi, interval = $interval"))
+        Future.failed(new RuntimeException(s"Fail to cleanup metrics for product = $product, kpi = $kpi, interval = $interval, status = ${response.status}, content = ${response.entity.asString}"))
     }
   }
 
