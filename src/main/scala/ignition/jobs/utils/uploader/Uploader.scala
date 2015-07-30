@@ -11,6 +11,8 @@ import ignition.jobs.SearchETL.KpiWithDashPoint
 import ignition.jobs.pojo.{RawTopQueries, RawValidQueries, TopQueriesSprayJsonFormatter, ValidQueriesSprayJsonFormatter}
 import ignition.jobs.utils.ElasticSearchClient
 import ignition.jobs.{DashboardAPISprayJsonFormatter, SearchETL}
+import org.jets3t.service.model.S3Object
+import org.joda.time.format.DateTimeFormat
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
@@ -22,6 +24,38 @@ import scala.util.{Failure, Success}
 
 object Uploader extends SearchETL {
 
+
+  implicit class S3ClientExtension(s3Client: S3Client) {
+
+    /**
+     * List the contents of  latest directory output that were output of a job, i.e., it has _SUCCESS inside.
+     *
+     * It works with dates of the form "yyyy_MM_dd'T'HH_mm_ssz" and accept a suffix.
+     *
+     * @param bucket
+     * @param key
+     */
+    def getLatestOutput(bucket: String, key: String, suffix: String): String = {
+
+      val pattern = s"""$key/(.+UTC)/.*""".r
+      val formatter = DateTimeFormat.forPattern("yyyy_MM_dd'T'HH_mm_ssz")
+
+      val bucketContent = s3Client.list(bucket, key).map(_.getKey)
+        .filter(_.contains("_SUCCESS"))
+        .filter(_.contains(suffix))
+        .map {
+        case pattern(date) => formatter.parseDateTime(date)
+      }
+
+      if (bucketContent.length == 0)
+        throw new Exception("Didn't find any _SUCCESS with the given parameters")
+
+      val latest = bucketContent
+        .foldLeft(bucketContent.head)((first, second) => if (first.isAfter(second)) first else second)
+
+      s"s3://$bucket/$key/${formatter.print(latest)}/$suffix"
+    }
+  }
 
 
   import DashboardAPISprayJsonFormatter._
@@ -36,7 +70,7 @@ object Uploader extends SearchETL {
   implicit lazy val actorSystem = ActorSystem("uploader")
 
   private case class UploaderConfig(eventType: String = "",
-                                    path: String = "",
+                                    path: Option[String] = None,
                                     server: String = "",
                                     port: Int = 9200,
                                     bulkTimeoutInMinutes: Int = 5,
@@ -47,26 +81,31 @@ object Uploader extends SearchETL {
     val parser = new scopt.OptionParser[UploaderConfig]("Uploader") {
       help("help").text("prints this usage text")
       arg[String]("eventType") required() action { (x, c) => c.copy(eventType = x) } text "(kpi | top-queries | valid-queries)"
-      arg[String]("path") required() action { (x, c) => c.copy(path = x) }  text "can be dir or file from 's3://<bucket>/<key>' or '/local/file/system'"
       opt[String]('j', "valid-queries-json-config") action { (x, c) => c.copy(validQueriesIndexConfigPath = Option(x)) }
       opt[String]('s', "es-server") action { (x, c) => c.copy(server = x) }
       opt[Int]('p', "es-port") action { (x, c) => c.copy(port = x) }
       opt[Int]('t', "es-save-timeout-minutes-per-bulk") action { (x, c) => c.copy(bulkTimeoutInMinutes = x) }
       opt[Int]('b', "es-bulk-size") action { (x, c) => c.copy(bulkSize = x) }
+      opt[String]('k', "s3-key") action { (x, c) => c.copy(path = Some(x)) } text "can be dir or file from 's3://<bucket>/<key>' or '/local/file/system'"
     }
 
     try {
       parser.parse(args, UploaderConfig()).foreach {
-        case UploaderConfig("top-queries", path, server, port, timeoutInMinutes, bulkSize, config) if path.nonEmpty && server.nonEmpty =>
-          runTopQueries(path, server, port, timeoutInMinutes, bulkSize, config)
+        case UploaderConfig("top-queries", path, server, port, timeoutInMinutes, bulkSize, config) if server.nonEmpty => {
+          runTopQueries(path.getOrElse(s3Client.getLatestOutput("chaordic-search-ignition-history", "SearchETLSetup/root", "top-queries")), server, port, timeoutInMinutes, bulkSize, config)
+        }
 
-        case UploaderConfig("valid-queries", path, server, port, timeoutInMinutes, bulkSize, config) if path.nonEmpty && server.nonEmpty =>
-          runValidQueries(path, server, port, timeoutInMinutes, bulkSize, config)
+        case UploaderConfig("valid-queries", path, server, port, timeoutInMinutes, bulkSize, config) if server.nonEmpty => {
+          runValidQueries(path.getOrElse(s3Client.getLatestOutput("chaordic-search-ignition-history", "ValidQueriesSetup/root", "")), server, port, timeoutInMinutes, bulkSize, config)
+        }
 
-        case UploaderConfig("kpi", path, _, _, _, timeoutInMinutes, _) if path.nonEmpty =>
-          runKpis(path, timeoutInMinutes)
+        case UploaderConfig("kpi", path, _, _, _, timeoutInMinutes, _) =>  {
+          runKpis(path.getOrElse(s3Client.getLatestOutput("chaordic-search-ignition-history", "SearchETLSetup/root", "kpi")), timeoutInMinutes)
+        }
 
-        case _ => throw new IllegalArgumentException(s"Invalid parameters: $parser")
+        case runConfig => {
+          throw new IllegalArgumentException(s"Invalid parameters: $runConfig")
+        }
       }
     } catch {
       case ex: IllegalArgumentException =>
@@ -79,6 +118,7 @@ object Uploader extends SearchETL {
     actorSystem.shutdown()
     ec.shutdown()
     logger.info("done!")
+    sys.exit()
   }
 
   private def runKpis(path: String, timeoutInMinutes: Int): Unit = {

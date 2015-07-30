@@ -96,15 +96,6 @@ object SearchETLSetup extends SearchETL {
       .saveAsTextFile(s3TopQueriesPath)
     logger.info(s"TopQueries saved to s3, path = $s3TopQueriesPath")
 
-    val defaultIndexConfig = Source.fromURL(getClass.getResource("/etl-top-queries-template.json")).mkString
-    val indexOperation = elasticSearch.saveTopQueries(topQueriesResults.collect().toIterator, defaultIndexConfig, bulkSize = 50)
-    indexOperation match {
-      case Success(_) => logger.info(s"Top-queries saved to elasticsearch!")
-      case Failure(ex) =>
-        logger.error(s"Fail to save top-queries", ex)
-        throw ex
-    }
-
     val fSaveKpis = saveKpisToDashBoard(kpis.collect().toSeq).map { _ =>
       logger.info("Kpis saved to dashboard!")
     }

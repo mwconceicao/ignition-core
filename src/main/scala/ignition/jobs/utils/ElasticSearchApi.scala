@@ -171,7 +171,7 @@ trait ElasticSearchApi {
 
   private def updateAliases(aliasName: String, newIndexName: String)(implicit timeout: Duration): Try[Unit] = {
     indexesInfo().flatMap { indexes =>
-      logger.info("Updating aliases to alias name '{}', new index: {}")
+      logger.info("Updating aliases to alias name '{}', new index: {}", aliasName, newIndexName)
       val oldIndexes = indexes.filter(index => index.aliases.contains(aliasName))
       val remove = oldIndexes.map(index => Map("remove" -> Map("index" -> index.name, "alias" -> aliasName)))
       val add = Map("add" -> Map("index" -> newIndexName, "alias" -> aliasName))

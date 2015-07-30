@@ -158,8 +158,16 @@ Check [search-ansible](https://github.com/chaordic/search-ansible)
 - To run the Uploader cli, first you need to:
 - `git clone git@github.com:chaordic/search-ignition.git --recursive`
 - Then o upload valid queries:
-- `./sbt "run-main ignition.jobs.utils.uploader.Uploader valid-queries s3://<bucket>/<path to folder with valid-queries part_* data> -s http://<elastichsearch server> -p 9200"`
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader valid-queries -s http://<elastichsearch server> -p 9200"`
 - Or to upload top queries:
-- `./sbt "run-main ignition.jobs.utils.uploader.Uploader top-queries s3://<bucket>/<path to folder with top-queries part_* data> -s http://<elastichsearch server> -p 9200"`
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader top-queries -s http://<elastichsearch server> -p 9200"`
 - Or to upload KPI:
-- `./sbt "run-main ignition.jobs.utils.uploader.Uploader kpi s3://<bucket>/<path to folder with kpi part_* data>"`
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader kpi"`
+
+Using the uploader without the parameter -k (as stated above) will fetch the latest successful output.
+- kpi -> s3://chaordic-search-ignition-history/SearchETLSetup/root/{{ LATEST PATH HERE }}/kpis
+- top-queries -> s3://chaordic-search-ignition-history/SearchETLSetup/root/{{ LATEST PATH HERE }}/top-queries
+- valid-queries -> s3://chaordic-search-ignition-history/ValidQueriesSetup/root/{{ LATEST PATH HERE }}/valid-queries
+
+Another way to upload stuff is to use the `-k` option, it will fetch the given output to upload, e.g.:
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader top-queries -k s3://<bucket>/<path to folder with top-queries part_* data> -s http://<elastichsearch server> -p 9200"`
