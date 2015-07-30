@@ -158,8 +158,11 @@ Check [search-ansible](https://github.com/chaordic/search-ansible)
 - To run the Uploader cli, first you need to:
 - `git clone git@github.com:chaordic/search-ignition.git --recursive`
 - Then o upload valid queries:
-- `./sbt "run-main ignition.jobs.utils.uploader.Uploader valid-queries s3://<bucket>/<path to folder with valid-queries part_* data> -s http://<elastichsearch server> -p 9200"`
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader valid-queries -k s3://<bucket>/<path to folder with valid-queries part_* data> -s http://<elastichsearch server> -p 9200"`
 - Or to upload top queries:
-- `./sbt "run-main ignition.jobs.utils.uploader.Uploader top-queries s3://<bucket>/<path to folder with top-queries part_* data> -s http://<elastichsearch server> -p 9200"`
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader top-queries -k s3://<bucket>/<path to folder with top-queries part_* data> -s http://<elastichsearch server> -p 9200"`
 - Or to upload KPI:
-- `./sbt "run-main ignition.jobs.utils.uploader.Uploader kpi s3://<bucket>/<path to folder with kpi part_* data>"`
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader kpi -k s3://<bucket>/<path to folder with kpi part_* data>"`
+
+Another way to upload stuff is to use the `-l` option instead of -k, -k will fetch the latest successful output to upload, e.g.:
+- `./sbt "run-main ignition.jobs.utils.uploader.Uploader top-queries -s http://192.168.59.103 -p 9200 -l s3://chaordic-search-ignition-history/SearchETLSetup/root/"`
