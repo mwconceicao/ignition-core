@@ -23,30 +23,8 @@ object Configuration {
    * Based on enviromnet variable 'RUN_MODE', loadConfiguration will load either application.conf or
    * application.prod.conf (with fallback to application.conf).
    */
+  lazy val RawConfiguration = ConfigFactory.load()
 
-  lazy val logger = LoggerFactory.getLogger("ignition.search.Configuration")
-
-  def runMode = readConfigFile.getOrElse("development")
-
-  private def loadConfiguration = {
-    logger info s"Running in $runMode mode"
-
-    if (runMode.equalsIgnoreCase("production"))
-      ConfigFactory.load("application.prod").withFallback(ConfigFactory.load())
-    else
-      ConfigFactory.load()
-  }
-
-  private def readConfigFile:Option[String] = try {
-    val source: BufferedSource = Source.fromFile("/etc/run-mode.conf")
-    val contents = Option(source.mkString.trim)
-    source.close
-    contents
-  } catch {
-    case e:Exception => None
-  }
-
-  lazy val RawConfiguration = loadConfiguration
 
   lazy val dashboardApiUrl = RawConfiguration.getString("dashboard-api.url")
   lazy val dashboardApiUser = RawConfiguration.getString("dashboard-api.user")
