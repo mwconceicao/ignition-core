@@ -41,10 +41,7 @@ object TransactionETLSetup extends SearchETL {
 
     logger.info(s"Starting TransactionETLSetup for start=$start, end=$end")
 
-    val allClients = executeRetrying(SearchApi.getClients())
-    logger.info(s"With clients: $allClients")
-
-    val transactions = parseTransactions(config.setupName, sc, start, end, allClients).persist(StorageLevel.MEMORY_AND_DISK)
+    val transactions = parseTransactions(config.setupName, sc, start, end).persist(StorageLevel.MEMORY_AND_DISK)
 
     logger.info(s"Starting ETLTransaction")
     val results = TransactionETL.process(transactions)
