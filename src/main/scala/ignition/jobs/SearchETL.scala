@@ -92,7 +92,7 @@ trait SearchETL {
     EntitiesLayer.parseSearchClickLogs(context.getTextFiles(paths), setupName)
   }
 
-  def parseTransactions(setupName: String, context: SparkContext, start: DateTime, end: DateTime, clients: Set[String]): RDD[Transaction] = {
+  def parseTransactions(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[Transaction] = {
     require(start.isBefore(end), s"Start = $start must be before end = $end")
     val paths = for { date <- dateRangeByDay(start, end) } yield {
       s"s3n://platform-dumps-virginia/buyOrders/${date.toString("yyyy-MM-dd")}/*.gz"

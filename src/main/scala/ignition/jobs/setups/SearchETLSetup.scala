@@ -41,16 +41,13 @@ object SearchETLSetup extends SearchETL {
 
     logger.info(s"Starting SearchETL for start=$start, end=$end")
 
-    val allClients = executeRetrying(SearchApi.getClients())
-    logger.info(s"With clients: $allClients")
-
     val s3KPIsPath = buildS3Prefix(config) + "/kpis"
     val s3TopQueriesPath = buildS3Prefix(config) + "/top-queries"
 
     logger.info(s"Starting ETLTransaction")
 
     logger.info(s"Parsing Transactions...")
-    val transactions = parseTransactions(config.setupName, sc, start, end, allClients).persist(StorageLevel.MEMORY_AND_DISK)
+    val transactions = parseTransactions(config.setupName, sc, start, end).persist(StorageLevel.MEMORY_AND_DISK)
 
     logger.info(s"Parsing Search logs...")
     val searchLogs = parseSearchLogs(config.setupName, sc, start, end).persist(StorageLevel.MEMORY_AND_DISK)
