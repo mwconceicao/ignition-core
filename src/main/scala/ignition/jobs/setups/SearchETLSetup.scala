@@ -34,8 +34,11 @@ object SearchETLSetup extends SearchETL {
     val sc = runnerContext.sparkContext
     val config = runnerContext.config
 
-    val start = parseDateOrElse(config.additionalArgs.get("start"), config.date.minusDays(1).withTimeAtStartOfDay())
-    val end = parseDateOrElse(config.additionalArgs.get("end"), config.date.minusDays(1).withTime(23, 59, 59, 999))
+    val start = parseDateOrElse(config.additionalArgs.get("start"),
+                                config.date.plusDays(Configuration.searchETLStart).withTimeAtStartOfDay())
+
+    val end = parseDateOrElse(config.additionalArgs.get("end"),
+                              config.date.minusDays(Configuration.searchETLEnd).withTime(23, 59, 59, 999))
 
     implicit val timeoutForSaveOperation: FiniteDuration = 30 minutes
 

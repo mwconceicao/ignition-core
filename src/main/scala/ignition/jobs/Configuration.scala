@@ -36,4 +36,10 @@ object Configuration {
   lazy val elasticSearchTimeoutInMinutes = RawConfiguration.getInt("elasticsearch.bulk-timeout-in-minutes")
   lazy val elasticSearchBulk = RawConfiguration.getInt("elasticsearch.bulk-size")
 
+  lazy val validQueriesStart = RawConfiguration.getInt("valid-queries.start")
+  lazy val validQueriesEnd = RawConfiguration.getInt("valid-queries.end")
+
+  lazy val searchETLStart = RawConfiguration.getInt("search-etl.start")
+  lazy val searchETLEnd = RawConfiguration.getInt("search-etl.end")
+
 }
