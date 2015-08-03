@@ -18,10 +18,10 @@ object ValidQueriesSetup extends SearchETL {
     val now = runnerContext.config.date
 
     val start = parseDateOrElse(config.additionalArgs.get("start"),
-                                config.date.plusDays(Configuration.validQueriesStart).withTime(23, 59, 59, 999))
+                                config.date.plusDays(Configuration.validQueriesStart).withTimeAtStartOfDay())
 
     val end = parseDateOrElse(config.additionalArgs.get("end"),
-                              config.date.minusDays(Configuration.validQueriesEnd).withTimeAtStartOfDay())
+                              config.date.plusDays(Configuration.validQueriesEnd).withTime(23, 59, 59, 999))
 
     logger.info(s"Starting ValidQueries for start=$start, end=$end")
 

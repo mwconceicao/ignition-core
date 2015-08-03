@@ -38,7 +38,7 @@ object SearchETLSetup extends SearchETL {
                                 config.date.plusDays(Configuration.searchETLStart).withTimeAtStartOfDay())
 
     val end = parseDateOrElse(config.additionalArgs.get("end"),
-                              config.date.minusDays(Configuration.searchETLEnd).withTime(23, 59, 59, 999))
+                              config.date.plusDays(Configuration.searchETLEnd).withTime(23, 59, 59, 999))
 
     implicit val timeoutForSaveOperation: FiniteDuration = 30 minutes
 
