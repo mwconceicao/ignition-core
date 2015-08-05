@@ -156,9 +156,9 @@ valid_queries_generation_cluster_options = [
 
     ClusterConf('c3.8xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '40G', 'hvm'),
 
-    ClusterConf('hi1.4xlarge', valid_queries_cluster_budget, 0.6, '8', '1', '40G', 'hvm'),
+    ClusterConf('hi1.4xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '40G', 'hvm'),
 
-    ClusterConf('cc2.8xlarge', valid_queries_cluster_budget, 0.6, '4', '1', '40G', 'hvm'),
+    ClusterConf('cc2.8xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '40G', 'hvm'),
 ]
 
 def send_heartbeat(retries=3):
