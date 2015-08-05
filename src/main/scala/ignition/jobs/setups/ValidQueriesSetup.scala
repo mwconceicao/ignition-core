@@ -34,7 +34,7 @@ object ValidQueriesSetup extends SearchETL {
 
     ValidQueriesJob.process(parsedSearchLogs, parsedClickLogs)
       .map(_.toRaw.toJson)
-      .coalesce(20)
+      .coalesce(numPartitions = 5000, shuffle = true)
       .saveAsTextFile(s3NPath)
 
   }
