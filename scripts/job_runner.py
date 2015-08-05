@@ -146,21 +146,19 @@ search_generation_cluster_options = [
 
 valid_queries_cluster_budget = 0.26 * 2 * 3 * 1.2 * 2
 valid_queries_generation_cluster_options = [
-    ClusterConf('r3.8xlarge', valid_queries_cluster_budget, 0.7, '8', '8', '15G', 'hvm'),
-    ClusterConf('r3.4xlarge', valid_queries_cluster_budget, 0.7, '16', '4', '15G', 'hvm'),
-    ClusterConf('r3.2xlarge', valid_queries_cluster_budget, 0.7, '32', '2', '15G', 'hvm'),
+    ClusterConf('r3.8xlarge', valid_queries_cluster_budget, 0.7, '8', '4', '40G', 'hvm'),
+    ClusterConf('r3.4xlarge', valid_queries_cluster_budget, 0.7, '16', '2', '40G', 'hvm'),
+    ClusterConf('r3.2xlarge', valid_queries_cluster_budget, 0.7, '32', '1', '40G', 'hvm'),
 
-    ClusterConf('d2.8xlarge', valid_queries_cluster_budget, 1, '2', '8', '15G', 'hvm'),
-    ClusterConf('d2.4xlarge', valid_queries_cluster_budget, 1, '4', '4', '15G', 'hvm'),
-    ClusterConf('d2.2xlarge', valid_queries_cluster_budget, 1, '8', '2', '15G', 'hvm'),
-    ClusterConf('d2.xlarge', valid_queries_cluster_budget, 1, '16', '1', '15G', 'hvm'),
+    ClusterConf('d2.8xlarge', valid_queries_cluster_budget, 1, '2', '4', '40G', 'hvm'),
+    ClusterConf('d2.4xlarge', valid_queries_cluster_budget, 1, '4', '2', '40G', 'hvm'),
+    ClusterConf('d2.2xlarge', valid_queries_cluster_budget, 1, '8', '1', '40G', 'hvm'),
 
-    ClusterConf('c3.8xlarge', valid_queries_cluster_budget, 0.7, '8', '3', '15G', 'hvm'),
-    ClusterConf('c3.4xlarge', valid_queries_cluster_budget, 0.7, '16', '1', '20G', 'hvm'),
+    ClusterConf('c3.8xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '40G', 'hvm'),
 
-    ClusterConf('hi1.4xlarge', valid_queries_cluster_budget, 0.6, '8', '2', '15G', 'hvm'),
+    ClusterConf('hi1.4xlarge', valid_queries_cluster_budget, 0.6, '8', '1', '40G', 'hvm'),
 
-    ClusterConf('cc2.8xlarge', valid_queries_cluster_budget, 0.6, '4', '2', '15G', 'hvm'),
+    ClusterConf('cc2.8xlarge', valid_queries_cluster_budget, 0.6, '4', '1', '40G', 'hvm'),
 ]
 
 def send_heartbeat(retries=3):
