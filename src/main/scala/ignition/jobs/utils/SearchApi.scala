@@ -13,7 +13,7 @@ object SearchApi {
 
   private val httpOpts = List(HttpOptions.connTimeout(30000), HttpOptions.readTimeout(60000))
 
-  val apiUrl = "https://search.chaordic.com.br/api/v1"
+  val apiUrl = "https://search-internal.chaordic.com.br/api/v1"
   val user = "dashboard-ignition"
   val password = "#d45h-z655as2AF78v"
 
