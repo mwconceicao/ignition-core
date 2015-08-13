@@ -459,21 +459,20 @@ EC2_INSTANCE_TYPES = {
 def get_tachyon_version(spark_version):
     return SPARK_TACHYON_MAP.get(spark_version, "")
 
-
 # Attempt to resolve an appropriate AMI given the architecture and region of the request.
-def get_spark_ami(opts):
-    if opts.instance_type in EC2_INSTANCE_TYPES:
-        instance_type = EC2_INSTANCE_TYPES[opts.instance_type]
+def get_spark_ami(instance_type, region, spark_ec2_git_repo, spark_ec2_git_branch):
+    if instance_type in EC2_INSTANCE_TYPES:
+        instance_type = EC2_INSTANCE_TYPES[instance_type]
     else:
         instance_type = "pvm"
-        print("Don't recognize %s, assuming type is pvm" % opts.instance_type, file=stderr)
+        print("Don't recognize %s, assuming type is pvm" % instance_type, file=stderr)
 
     # URL prefix from which to fetch AMI information
     ami_prefix = "{r}/{b}/ami-list".format(
-        r=opts.spark_ec2_git_repo.replace("https://github.com", "https://raw.github.com", 1),
-        b=opts.spark_ec2_git_branch)
+        r=spark_ec2_git_repo.replace("https://github.com", "https://raw.github.com", 1),
+        b=spark_ec2_git_branch)
 
-    ami_path = "%s/%s/%s" % (ami_prefix, opts.region, instance_type)
+    ami_path = "%s/%s/%s" % (ami_prefix, region, instance_type)
     reader = codecs.getreader("ascii")
     try:
         ami = reader(urlopen(ami_path)).read().strip()
@@ -483,7 +482,6 @@ def get_spark_ami(opts):
 
     print("Spark AMI: " + ami)
     return ami
-
 
 # Launch a cluster of the given name, by setting up its security groups,
 # and then starting new instances in them.
@@ -584,10 +582,10 @@ def launch_cluster(conn, opts, cluster_name):
 
     # Figure out Spark AMI
     if opts.ami is None:
-        opts.ami = get_spark_ami(opts)
+        opts.ami = get_spark_ami(opts.instance_type, opts.region, opts.spark_ec2_git_repo, opts.spark_ec2_git_branch)
 
     if opts.master_ami is None:
-        opts.master_ami = get_spark_ami(opts.master_instance_type, opts.region, opts.spark_ec2_git_repo, opts.spark_ec2_git_branch) 
+        opts.master_ami = get_spark_ami(opts.master_instance_type, opts.region, opts.spark_ec2_git_repo, opts.spark_ec2_git_branch)
 
     # we use group ids to work around https://github.com/boto/boto/issues/350
     additional_group_ids = []
