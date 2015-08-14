@@ -51,7 +51,6 @@ default_spark_repo = 'https://github.com/chaordic/spark'
 default_remote_user = 'ec2-user'
 default_remote_control_dir = '/tmp/Ignition'
 default_collect_results_dir = '/tmp'
-default_user_data = os.path.join(script_path, 'scripts', 'S05mount-disks')
 default_defaults_filename = 'cluster_defaults.json'
 
 default_spark_ec2_git_repo = 'https://github.com/chaordic/spark-ec2'
@@ -202,7 +201,6 @@ def launch(cluster_name, slaves,
            key_id=default_key_id, region=default_region,
            zone=default_zone, instance_type=default_instance_type,
            ondemand=False, spot_price=default_spot_price,
-           user_data=default_user_data,
            security_group = None,
            vpc = None,
            vpc_subnet = None,
@@ -272,7 +270,6 @@ def launch(cluster_name, slaves,
                                  '--master-opts', '-Dspark.worker.timeout={0}'.format(worker_timeout),
                                  '--spark-git-repo', spark_repo,
                                  '-v', spark_version,
-                                 '--user-data', user_data,
                                  'launch', cluster_name] +
                                 spot_params +
                                 resume_param +
