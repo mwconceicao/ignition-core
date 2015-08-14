@@ -357,15 +357,15 @@ def get_or_make_group(conn, name, vpc_id):
         return conn.create_security_group(name, "Spark EC2 group", vpc_id)
 
 def check_if_http_resource_exists(resource):
-    request = urllib2.Request(resource)
+    request = Request(resource)
     request.get_method = lambda: 'HEAD'
     try:
-        response = urllib2.urlopen(request)
+        response = urlopen(request)
         if response.getcode() == 200:
             return True
         else:
             raise RuntimeError("Resource {resource} not found. Error: {code}".format(resource, response.getcode()))
-    except urllib2.HTTPError, e:
+    except HTTPError, e:
         print >> stderr, "Unable to check if HTTP resource {url} exists. Error: {code}".format(
             url=resource,
             code=e.code)
@@ -831,7 +831,7 @@ def setup_cluster(conn, master_nodes, slave_nodes, opts, deploy_ssh_key):
             ssh_write(slave_address, opts, ['tar', 'x'], dot_ssh_tar)
 
     modules = ['spark', 'ephemeral-hdfs', 'persistent-hdfs',
-               'mapreduce', 'spark-standalone', 'tachyon', 'rstudio']
+               'mapreduce', 'spark-standalone', 'tachyon']
 
     if opts.hadoop_major_version == "1":
         modules = list(filter(lambda x: x != "mapreduce", modules))
