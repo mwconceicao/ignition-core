@@ -51,11 +51,11 @@ default_spark_repo = 'https://github.com/chaordic/spark'
 default_remote_user = 'ec2-user'
 default_remote_control_dir = '/tmp/Ignition'
 default_collect_results_dir = '/tmp'
-default_user_data = os.path.join(script_path, 'scripts', 'S05mount-disks')
+default_user_data = os.path.join(script_path, 'scripts', 'noop')
 default_defaults_filename = 'cluster_defaults.json'
 
 default_spark_ec2_git_repo = 'https://github.com/chaordic/spark-ec2'
-default_spark_ec2_git_branch = 'v4-yarn'
+default_spark_ec2_git_branch = 'branch-1.4-merge'
 
 
 master_post_create_commands = [
