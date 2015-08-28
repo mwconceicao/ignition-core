@@ -52,7 +52,7 @@ object SparkContextUtils {
       if (splittedPaths.size < minimumPaths)
         throw new Exception(s"Not enough paths found for $paths")
 
-      val rdds = splittedPaths.grouped(50).map(pathGroup => f(pathGroup.mkString(",")))
+      val rdds = splittedPaths.grouped(5000).map(pathGroup => f(pathGroup.mkString(",")))
 
       new UnionRDD(sc, rdds.toList)
     }
