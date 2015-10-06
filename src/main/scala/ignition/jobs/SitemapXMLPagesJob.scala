@@ -53,14 +53,14 @@ object SitemapXMLSearchJob {
     val rankedQueries = searchLogs
       .filter(p => p.feature == "standard" && p.products.nonEmpty)
       .map(p => p.query)
-      .map(slugify_plus)
+      .map(slugify_space)
       .map(q => (q, 1))
       .reduceByKey(_ + _)
 
     val rankedQueriesByClicks = clickLogs
       .filter(p => p.feature == "search")
       .map(p => p.query)
-      .map(slugify_plus)
+      .map(slugify_space)
       .map(q => (q, 1))
       .reduceByKey(_ + _)
 
@@ -96,10 +96,10 @@ object SitemapXMLPagesJob {
       .toLowerCase                  // Lowercase the final results
   }
 
-  def slugify_plus(input: String): String = {
-    // to keep the plus (+) and in the final replace all dashes (-) to plus (+)
+  def slugify_space(input: String): String = {
+    // to keep the space and in the final replace all dashes (-) to space
     // to be used in query normalization
-    slugify(input.replace('+', ' ')).replace('-', '+')
+    slugify(input.replace('+', ' ')).replace('-', ' ')
   }
 
   def generateDetailsKeySets(conf: SitemapConfig): List[Set[String]] = conf.details.subsets.toList
