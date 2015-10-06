@@ -1,6 +1,7 @@
 package ignition.jobs
 
 import java.net.URLEncoder
+import java.net.URLDecoder
 
 import ignition.chaordic.JsonParser
 import ignition.chaordic.pojo.{SearchClickLog, SearchLog, Product}
@@ -16,6 +17,7 @@ import org.joda.time.DateTime
 object SitemapXMLJob {
 
   def encode(s: String): String = URLEncoder.encode(s, "UTF-8")
+  def decode(s: String): String = URLDecoder.decode(s, "UTF-8")
 
   def generateUrlXml(url: String, lastMod: DateTime, changeFreq: String, priority: Double): String = {
     val xml = <url>
@@ -99,7 +101,10 @@ object SitemapXMLPagesJob {
   def slugify_space(input: String): String = {
     // to keep the space and in the final replace all dashes (-) to space
     // to be used in query normalization
-    slugify(input.replace('+', ' ')).replace('-', ' ')
+    slugify(
+      decode(input)
+      .replace('+', ' ')
+    ).replace('-', ' ')
   }
 
   def generateDetailsKeySets(conf: SitemapConfig): List[Set[String]] = conf.details.subsets.toList
