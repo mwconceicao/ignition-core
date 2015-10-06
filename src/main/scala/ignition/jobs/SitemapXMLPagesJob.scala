@@ -52,12 +52,16 @@ object SitemapXMLSearchJob {
                             config: SitemapConfig): RDD[String] = {
     val rankedQueries = searchLogs
       .filter(p => p.feature == "standard" && p.products.nonEmpty)
-      .map(p => (p.query, 1))
+      .map(p => p.query)
+      .map(slugify_plus)
+      .map(q => (q, 1))
       .reduceByKey(_ + _)
 
     val rankedQueriesByClicks = clickLogs
       .filter(p => p.feature == "search")
-      .map(p => (p.query, 1))
+      .map(p => p.query)
+      .map(slugify_plus)
+      .map(q => (q, 1))
       .reduceByKey(_ + _)
 
     val combinedQueriesWithRanks: RDD[String] = sc.parallelize {
@@ -90,6 +94,12 @@ object SitemapXMLPagesJob {
       .trim                         // Trim leading/trailing whitespace (including what used to be leading/trailing dashes)
       .replaceAll("\\s+", "-")      // Replace whitespace (including newlines and repetitions) with single dashes
       .toLowerCase                  // Lowercase the final results
+  }
+
+  def slugify_plus(input: String): String = {
+    // to keep the plus (+) and in the final replace all dashes (-) to plus (+)
+    // to be used in query normalization
+    slugify(input.replace('+', ' ')).replace('-', '+')
   }
 
   def generateDetailsKeySets(conf: SitemapConfig): List[Set[String]] = conf.details.subsets.toList
