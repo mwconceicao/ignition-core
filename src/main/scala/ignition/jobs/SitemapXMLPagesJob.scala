@@ -102,8 +102,7 @@ object SitemapXMLPagesJob {
     // to keep the space and in the final replace all dashes (-) to space
     // to be used in query normalization
     slugify(
-      decode(input)
-      .replace('+', ' ')
+      decode(input).replace('+', ' ')
     ).replace('-', ' ')
   }
 
