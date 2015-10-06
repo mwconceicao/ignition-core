@@ -42,6 +42,25 @@ object SitemapXMLJob {
       Iterator(header) ++ urls ++ Iterator(footer)
     }
   }
+
+  def slugify(input: String): String = {
+    import java.text.Normalizer
+    Normalizer.normalize(input, Normalizer.Form.NFKD)
+      .replaceAll("[^\\w\\s-]", "") // Remove all non-word, non-space or non-dash characters
+      .replace('-', ' ')            // Replace dashes with spaces
+      .trim                         // Trim leading/trailing whitespace (including what used to be leading/trailing dashes)
+      .replaceAll("\\s+", "-")      // Replace whitespace (including newlines and repetitions) with single dashes
+      .toLowerCase                  // Lowercase the final results
+  }
+
+  def slugify_space(input: String): String = {
+    // to keep the space and in the final replace all dashes (-) to space
+    // to be used in query normalization
+    slugify(
+      decode(input).replace('+', ' ')
+    ).replace('-', ' ')
+  }
+
 }
 
 
@@ -87,24 +106,6 @@ object SitemapXMLSearchJob {
 
 object SitemapXMLPagesJob {
   // This returns a RDD where each key is a word and the value is how many times it appeared in the content of lines
-
-  def slugify(input: String): String = {
-    import java.text.Normalizer
-    Normalizer.normalize(input, Normalizer.Form.NFKD)
-      .replaceAll("[^\\w\\s-]", "") // Remove all non-word, non-space or non-dash characters
-      .replace('-', ' ')            // Replace dashes with spaces
-      .trim                         // Trim leading/trailing whitespace (including what used to be leading/trailing dashes)
-      .replaceAll("\\s+", "-")      // Replace whitespace (including newlines and repetitions) with single dashes
-      .toLowerCase                  // Lowercase the final results
-  }
-
-  def slugify_space(input: String): String = {
-    // to keep the space and in the final replace all dashes (-) to space
-    // to be used in query normalization
-    slugify(
-      decode(input).replace('+', ' ')
-    ).replace('-', ' ')
-  }
 
   def generateDetailsKeySets(conf: SitemapConfig): List[Set[String]] = conf.details.subsets.toList
 
