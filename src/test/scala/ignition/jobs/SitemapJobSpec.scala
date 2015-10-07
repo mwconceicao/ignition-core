@@ -171,8 +171,10 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContex
       sc.parallelize(searchLogs),
       sc.parallelize(searchClicks), config).collect()
 
-    result(0).contains("<loc>http://myhost/?q=livro+Romance</loc>") shouldBe true
-    result(1).contains("<loc>http://myhost/?q=watchman</loc>") shouldBe true
-    result(2).contains("<loc>http://myhost/?q=estante+home</loc>") shouldBe true
+    val sorted_result = result.sorted
+    sorted_result.size shouldBe 3
+    sorted_result(0).contains("<loc>http://myhost/?q=estante+home</loc>") shouldBe true
+    sorted_result(1).contains("<loc>http://myhost/?q=livro+romance</loc>") shouldBe true
+    sorted_result(2).contains("<loc>http://myhost/?q=watchman</loc>") shouldBe true
   }
 }
