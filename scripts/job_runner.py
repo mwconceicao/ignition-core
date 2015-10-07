@@ -161,6 +161,26 @@ valid_queries_generation_cluster_options = [
     ClusterConf('cc2.8xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '40G', 'hvm'),
 ]
 
+sitemap_generation_cluster_budget = 0.22 * 2 * 4 * 1.2 * 2
+sitemap_generation_cluster_options = [
+    ClusterConf('r3.8xlarge', sitemap_generation_cluster_budget, 0.8, '3', '8', '15G', 'hvm'),
+    ClusterConf('r3.4xlarge', sitemap_generation_cluster_budget, 0.8, '5', '4', '15G', 'hvm'),
+    ClusterConf('r3.2xlarge', sitemap_generation_cluster_budget, 0.8, '9', '2', '15G', 'hvm'),
+
+    ClusterConf('d2.8xlarge', sitemap_generation_cluster_budget, 1, '1', '8', '15G', 'hvm'),
+    ClusterConf('d2.4xlarge', sitemap_generation_cluster_budget, 1, '1', '4', '15G', 'hvm'),
+    ClusterConf('d2.2xlarge', sitemap_generation_cluster_budget, 1, '2', '2', '15G', 'hvm'),
+    ClusterConf('d2.xlarge', sitemap_generation_cluster_budget, 1, '4', '1', '15G', 'hvm'),
+
+    ClusterConf('c3.8xlarge', sitemap_generation_cluster_budget, 0.7, '3', '3', '15G', 'hvm'),
+    ClusterConf('c3.4xlarge', sitemap_generation_cluster_budget, 0.7, '5', '1', '15G', 'hvm'),
+    ClusterConf('c3.2xlarge', sitemap_generation_cluster_budget, 0.7, '9', '1', '7G', 'hvm'),
+
+    ClusterConf('hi1.4xlarge', sitemap_generation_cluster_budget, 0.6, '4', '2', '15G', 'hvm'),
+
+    ClusterConf('cc2.8xlarge', sitemap_generation_cluster_budget, 0.6, '2', '2', '15G', 'hvm'),
+]
+
 def send_heartbeat(retries=3):
     for i in range(retries):
         try:
@@ -599,7 +619,7 @@ def sitemap_generation(collect_results_dir, disable_vpc = False, security_group 
             "sitemaps",
              job_name="SitemapXMLSetup",
              cluster_name_prefix="sitemap-generation",
-             cluster_options=search_generation_cluster_options,
+             cluster_options=sitemap_generation_cluster_options,
              disable_vpc=disable_vpc,
              security_group=security_group,
              tag=["chaordic:role=gen.sitemap"])
