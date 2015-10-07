@@ -1,6 +1,7 @@
 package ignition.jobs
 
 import java.net.URLEncoder
+import java.net.URLDecoder
 
 import ignition.chaordic.JsonParser
 import ignition.chaordic.pojo.{SearchClickLog, SearchLog, Product}
@@ -16,6 +17,7 @@ import org.joda.time.DateTime
 object SitemapXMLJob {
 
   def encode(s: String): String = URLEncoder.encode(s, "UTF-8")
+  def decode(s: String): String = URLDecoder.decode(s, "UTF-8")
 
   def generateUrlXml(url: String, lastMod: DateTime, changeFreq: String, priority: Double): String = {
     val xml = <url>
@@ -40,6 +42,25 @@ object SitemapXMLJob {
       Iterator(header) ++ urls ++ Iterator(footer)
     }
   }
+
+  def slugify(input: String): String = {
+    import java.text.Normalizer
+    Normalizer.normalize(input, Normalizer.Form.NFKD)
+      .replaceAll("[^\\w\\s-]", "") // Remove all non-word, non-space or non-dash characters
+      .replace('-', ' ')            // Replace dashes with spaces
+      .trim                         // Trim leading/trailing whitespace (including what used to be leading/trailing dashes)
+      .replaceAll("\\s+", "-")      // Replace whitespace (including newlines and repetitions) with single dashes
+      .toLowerCase                  // Lowercase the final results
+  }
+
+  def slugifySpace(input: String): String = {
+    // to keep the space and in the final replace all dashes (-) to space
+    // to be used in query normalization
+    slugify(
+      decode(input).replace('+', ' ')
+    ).replace('-', ' ')
+  }
+
 }
 
 
@@ -52,12 +73,12 @@ object SitemapXMLSearchJob {
                             config: SitemapConfig): RDD[String] = {
     val rankedQueries = searchLogs
       .filter(p => p.feature == "standard" && p.products.nonEmpty)
-      .map(p => (p.query, 1))
+      .map(p => (slugifySpace(p.query), 1))
       .reduceByKey(_ + _)
 
     val rankedQueriesByClicks = clickLogs
       .filter(p => p.feature == "search")
-      .map(p => (p.query, 1))
+      .map(p => (slugifySpace(p.query), 1))
       .reduceByKey(_ + _)
 
     val combinedQueriesWithRanks: RDD[String] = sc.parallelize {
@@ -81,16 +102,6 @@ object SitemapXMLSearchJob {
 
 object SitemapXMLPagesJob {
   // This returns a RDD where each key is a word and the value is how many times it appeared in the content of lines
-
-  def slugify(input: String): String = {
-    import java.text.Normalizer
-    Normalizer.normalize(input, Normalizer.Form.NFKD)
-      .replaceAll("[^\\w\\s-]", "") // Remove all non-word, non-space or non-dash characters
-      .replace('-', ' ')            // Replace dashes with spaces
-      .trim                         // Trim leading/trailing whitespace (including what used to be leading/trailing dashes)
-      .replaceAll("\\s+", "-")      // Replace whitespace (including newlines and repetitions) with single dashes
-      .toLowerCase                  // Lowercase the final results
-  }
 
   def generateDetailsKeySets(conf: SitemapConfig): List[Set[String]] = conf.details.subsets.toList
 
