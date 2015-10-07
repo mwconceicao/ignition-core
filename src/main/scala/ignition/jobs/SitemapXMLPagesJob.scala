@@ -53,7 +53,7 @@ object SitemapXMLJob {
       .toLowerCase                  // Lowercase the final results
   }
 
-  def slugify_space(input: String): String = {
+  def slugifySpace(input: String): String = {
     // to keep the space and in the final replace all dashes (-) to space
     // to be used in query normalization
     slugify(
@@ -73,16 +73,12 @@ object SitemapXMLSearchJob {
                             config: SitemapConfig): RDD[String] = {
     val rankedQueries = searchLogs
       .filter(p => p.feature == "standard" && p.products.nonEmpty)
-      .map(p => p.query)
-      .map(slugify_space)
-      .map(q => (q, 1))
+      .map(p => (slugifySpace(p.query), 1))
       .reduceByKey(_ + _)
 
     val rankedQueriesByClicks = clickLogs
       .filter(p => p.feature == "search")
-      .map(p => p.query)
-      .map(slugify_space)
-      .map(q => (q, 1))
+      .map(p => (slugifySpace(p.query), 1))
       .reduceByKey(_ + _)
 
     val combinedQueriesWithRanks: RDD[String] = sc.parallelize {
