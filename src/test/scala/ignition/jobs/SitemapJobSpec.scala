@@ -147,6 +147,9 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContex
     """.stripMargin,
     """
       |{"apiKey":"saraiva-v5","query":"livro%20romance","pageSize":48,"totalFound":0,"userId":"anon-34a6d2f4-080a-11e5-9fc8-024ce8a621bb","filters":null,"date":"2015-06-01T00:00:04.090027","info":{"searchId":"66ecf418-b15a-4d8d-9a55-c759d1dd1ef8","resultsExpansion":true,"ip":"66.249.64.146","personalizeResults":false,"realUserId":null,"queryTime":17,"relatedQuery":null,"sesssion":null,"chaordic_testGroup":null,"hasSynonyms":false,"browser_family":"Googlebot","forceOriginal":false},"feature":"standard","page":1,"products":[{"info":{"purchase_weight":0,"score":3.043074,"view_weight":0},"id":"22578"},{"info":{"purchase_weight":0,"score":3.043074,"view_weight":0},"id":"68774"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.3353748,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.3978953,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":2.5505974,"view_weight":0},"id":"22578"},{"info":{"purchase_weight":0,"score":2.5505974,"view_weight":0},"id":"68774"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.1102133,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.5257285,"view_weight":0},"id":"127209"}],"order":null}
+    """.stripMargin,
+    """
+      |{"apiKey":"saraiva-v5","query":"7% de desconto","pageSize":48,"totalFound":0,"userId":"anon-34a6d2f4-080a-11e5-9fc8-024ce8a621bb","filters":null,"date":"2015-06-01T00:00:04.090027","info":{"searchId":"66ecf418-b15a-4d8d-9a55-c759d1dd1ef8","resultsExpansion":true,"ip":"66.249.64.146","personalizeResults":false,"realUserId":null,"queryTime":17,"relatedQuery":null,"sesssion":null,"chaordic_testGroup":null,"hasSynonyms":false,"browser_family":"Googlebot","forceOriginal":false},"feature":"standard","page":1,"products":[{"info":{"purchase_weight":0,"score":3.043074,"view_weight":0},"id":"22578"},{"info":{"purchase_weight":0,"score":3.043074,"view_weight":0},"id":"68774"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.3353748,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.3978953,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"21178"},{"info":{"purchase_weight":0,"score":2.5505974,"view_weight":0},"id":"22578"},{"info":{"purchase_weight":0,"score":2.5505974,"view_weight":0},"id":"68774"},{"info":{"purchase_weight":0,"score":3.8903718,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.1102133,"view_weight":0},"id":"127209"},{"info":{"purchase_weight":0,"score":3.5257285,"view_weight":0},"id":"127209"}],"order":null}
     """.stripMargin
   ).map(new SearchLogParser().from)
 
@@ -172,9 +175,10 @@ class SitemapJobSpec extends FlatSpec with ShouldMatchers with SharedSparkContex
       sc.parallelize(searchClicks), config).collect()
 
     val sortedResult = result.sorted
-    sortedResult.size shouldBe 3
-    sortedResult(0).contains("<loc>http://myhost/?q=estante+home</loc>") shouldBe true
-    sortedResult(1).contains("<loc>http://myhost/?q=livro+romance</loc>") shouldBe true
-    sortedResult(2).contains("<loc>http://myhost/?q=watchman</loc>") shouldBe true
+    sortedResult.size shouldBe 4
+    sortedResult(0).contains("<loc>http://myhost/?q=7+de+desconto</loc>") shouldBe true
+    sortedResult(1).contains("<loc>http://myhost/?q=estante+home</loc>") shouldBe true
+    sortedResult(2).contains("<loc>http://myhost/?q=livro+romance</loc>") shouldBe true
+    sortedResult(3).contains("<loc>http://myhost/?q=watchman</loc>") shouldBe true
   }
 }

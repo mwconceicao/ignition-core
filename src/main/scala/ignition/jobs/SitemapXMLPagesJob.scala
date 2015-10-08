@@ -17,7 +17,13 @@ import org.joda.time.DateTime
 object SitemapXMLJob {
 
   def encode(s: String): String = URLEncoder.encode(s, "UTF-8")
-  def decode(s: String): String = URLDecoder.decode(s, "UTF-8")
+  def decode(s: String): String = {
+    try {
+      URLDecoder.decode(s, "UTF-8")
+    } catch {
+      case e: Exception => s
+    }
+  }
 
   def generateUrlXml(url: String, lastMod: DateTime, changeFreq: String, priority: Double): String = {
     val xml = <url>
