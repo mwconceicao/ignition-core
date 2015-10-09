@@ -163,14 +163,14 @@ valid_queries_generation_cluster_options = [
 
 sitemap_generation_cluster_budget = 0.22 * 2 * 4 * 1.2 * 2
 sitemap_generation_cluster_options = [
+    ClusterConf('d2.8xlarge', sitemap_generation_cluster_budget, 1, '1', '8', '15G', 'hvm'),
+    ClusterConf('d2.4xlarge', sitemap_generation_cluster_budget, 1, '2', '4', '15G', 'hvm'),
+    ClusterConf('d2.2xlarge', sitemap_generation_cluster_budget, 1, '3', '2', '15G', 'hvm'),
+    ClusterConf('d2.xlarge', sitemap_generation_cluster_budget, 1, '4', '1', '15G', 'hvm'),
+
     ClusterConf('r3.8xlarge', sitemap_generation_cluster_budget, 0.8, '3', '8', '15G', 'hvm'),
     ClusterConf('r3.4xlarge', sitemap_generation_cluster_budget, 0.8, '5', '4', '15G', 'hvm'),
     ClusterConf('r3.2xlarge', sitemap_generation_cluster_budget, 0.8, '9', '2', '15G', 'hvm'),
-
-    ClusterConf('d2.8xlarge', sitemap_generation_cluster_budget, 1, '1', '8', '15G', 'hvm'),
-    ClusterConf('d2.4xlarge', sitemap_generation_cluster_budget, 1, '1', '4', '15G', 'hvm'),
-    ClusterConf('d2.2xlarge', sitemap_generation_cluster_budget, 1, '2', '2', '15G', 'hvm'),
-    ClusterConf('d2.xlarge', sitemap_generation_cluster_budget, 1, '4', '1', '15G', 'hvm'),
 
     ClusterConf('c3.8xlarge', sitemap_generation_cluster_budget, 0.7, '3', '3', '15G', 'hvm'),
     ClusterConf('c3.4xlarge', sitemap_generation_cluster_budget, 0.7, '5', '1', '15G', 'hvm'),
