@@ -32,6 +32,7 @@ object Runner {
       "spark.driver.userClassPathFirst" -> "true",
       "spark.executor.userClassPathFirst" -> "true",
       "spark.hadoop.validateOutputSpecs" -> "true",
+      "spark.driver.maxResultSize" -> "2g",
       "spark.eventLog.enabled" -> "false" // may break the master with big jobs if true
     )
     CoreJobRunner.runJobSetup(args, availableJobsSetups, defaultSparkConf)
