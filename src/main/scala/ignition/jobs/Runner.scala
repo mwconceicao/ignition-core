@@ -29,6 +29,7 @@ object Runner {
       "spark.akka.frameSize" -> "500",
       "spark.shuffle.memoryFraction" -> "0.2",
       "spark.storage.memoryFraction" -> "0.3",
+      "spark.driver.maxResultSize" -> "0",
       "spark.driver.userClassPathFirst" -> "true",
       "spark.executor.userClassPathFirst" -> "true",
       "spark.hadoop.validateOutputSpecs" -> "true",
