@@ -150,9 +150,9 @@ valid_queries_generation_cluster_options = [
     ClusterConf('r3.4xlarge', valid_queries_cluster_budget, 0.7, '16', '2', '40G', 'hvm'),
     ClusterConf('r3.2xlarge', valid_queries_cluster_budget, 0.7, '32', '1', '40G', 'hvm'),
 
-    ClusterConf('d2.8xlarge', valid_queries_cluster_budget, 1, '2', '4', '40G', 'hvm'),
-    ClusterConf('d2.4xlarge', valid_queries_cluster_budget, 1, '4', '2', '40G', 'hvm'),
-    ClusterConf('d2.2xlarge', valid_queries_cluster_budget, 1, '8', '1', '40G', 'hvm'),
+    ClusterConf('d2.8xlarge', valid_queries_cluster_budget, 1, '7', '4', '40G', 'hvm'),
+    ClusterConf('d2.4xlarge', valid_queries_cluster_budget, 1, '14', '2', '40G', 'hvm'),
+    ClusterConf('d2.2xlarge', valid_queries_cluster_budget, 1, '28', '1', '40G', 'hvm'),
 
     ClusterConf('c3.8xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '40G', 'hvm'),
 
