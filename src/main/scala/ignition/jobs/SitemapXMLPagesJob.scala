@@ -97,7 +97,7 @@ object SitemapXMLSearchJob {
     val queryStrings = combinedQueriesWithRanks.map {
       query =>
         val link = s"${config.normalizedHost}/?q=${encode(query)}"
-        generateUrlXml(link, now, "daily", 0.5)
+        generateUrlXml(link, now, "weekly", 0.5)
     }
 
     queryStrings
