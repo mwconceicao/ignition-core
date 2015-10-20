@@ -86,7 +86,7 @@ object SitemapXMLSetup extends ExecutionRetry {
         val pageUrls = if (conf.generatePages) {
           val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz",
             endDate = Option(now), lastN = Option(1)).repartition(500))
-          SitemapXMLPagesJob.generateUrlXMLs(sc, now, products, conf)
+          SitemapXMLPagesJob.generatePagesUrlXMLs(sc, now, products, conf)
         } else {
           sc.emptyRDD[String]
         }

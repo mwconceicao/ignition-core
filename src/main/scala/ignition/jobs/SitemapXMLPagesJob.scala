@@ -97,7 +97,7 @@ object SitemapXMLSearchJob {
     val queryStrings = combinedQueriesWithRanks.map {
       query =>
         val link = s"${config.normalizedHost}/?q=${encode(query)}"
-        generateUrlXml(link, now, "daily", 1.0)
+        generateUrlXml(link, now, "weekly", 0.5)
     }
 
     queryStrings
@@ -144,7 +144,7 @@ object SitemapXMLPagesJob {
     }
   }
 
-  def generateUrlXMLs(sc: SparkContext, _now: DateTime, products: RDD[Product], conf: SitemapConfig): RDD[String] = {
+  def generatePagesUrlXMLs(sc: SparkContext, _now: DateTime, products: RDD[Product], conf: SitemapConfig): RDD[String] = {
     val detailsKeySets = sc.broadcast(generateDetailsKeySets(conf))
     val now = sc.broadcast(_now)
     products
@@ -154,7 +154,7 @@ object SitemapXMLPagesJob {
       })
       .flatMap { product =>
         generateLink(conf, product, detailsKeySets.value).map { link =>
-          generateUrlXml(link, now.value, "daily", 1)
+          generateUrlXml(link, now.value, "weekly", 1)
         }
       }.distinct()
   }
