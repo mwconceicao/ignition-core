@@ -144,7 +144,7 @@ object SitemapXMLPagesJob {
     }
   }
 
-  def generateUrlXMLs(sc: SparkContext, _now: DateTime, products: RDD[Product], conf: SitemapConfig): RDD[String] = {
+  def generatePagesUrlXMLs(sc: SparkContext, _now: DateTime, products: RDD[Product], conf: SitemapConfig): RDD[String] = {
     val detailsKeySets = sc.broadcast(generateDetailsKeySets(conf))
     val now = sc.broadcast(_now)
     products
