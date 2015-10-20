@@ -154,7 +154,7 @@ object SitemapXMLPagesJob {
       })
       .flatMap { product =>
         generateLink(conf, product, detailsKeySets.value).map { link =>
-          generateUrlXml(link, now.value, "daily", 1)
+          generateUrlXml(link, now.value, "weekly", 1)
         }
       }.distinct()
   }
