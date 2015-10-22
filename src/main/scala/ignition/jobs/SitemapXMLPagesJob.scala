@@ -72,15 +72,25 @@ object SitemapXMLJob {
 
 object SitemapXMLSearchJob {
 
+  case class TinySearchLog(date: DateTime, feature: String)
+  case class AccumulatedSearches(last: TinySearchLog, total: Int)
+
   def generateSearchUrlXMLs(sc: SparkContext,
                             now: DateTime,
                             searchLogs: RDD[SearchLog],
                             clickLogs: RDD[SearchClickLog],
                             config: SitemapConfig): RDD[String] = {
     val rankedQueries = searchLogs
-      .filter(p => p.feature == "standard" && p.products.nonEmpty)
-      .map(p => (slugifySpace(p.query), 1))
-      .reduceByKey(_ + _)
+      .collect { case p if p.products.nonEmpty =>
+        slugifySpace(p.query) -> AccumulatedSearches(TinySearchLog(p.date, p.feature), 1)
+      }
+      .reduceByKey { (acc1, acc2) =>
+        val last = if (acc1.last.date.isAfter(acc2.last.date)) acc1.last else acc2.last
+        AccumulatedSearches(last, acc1.total + acc2.total)
+      }
+      .collect { case (k, acc) if acc.last.feature == "standard" =>
+        k -> acc.total
+      }
 
     val rankedQueriesByClicks = clickLogs
       .filter(p => p.feature == "search")
