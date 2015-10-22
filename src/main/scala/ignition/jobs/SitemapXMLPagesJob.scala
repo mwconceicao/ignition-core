@@ -72,18 +72,21 @@ object SitemapXMLJob {
 
 object SitemapXMLSearchJob {
 
+  case class ThinQuery(date: DateTime, feature: String)
+
   def generateSearchUrlXMLs(sc: SparkContext,
                             now: DateTime,
                             searchLogs: RDD[SearchLog],
                             clickLogs: RDD[SearchClickLog],
                             config: SitemapConfig): RDD[String] = {
     val rankedQueries = searchLogs
-      .filter(p => p.products.nonEmpty)
-      .map(p => (slugifySpace(p.query), (p.date, p.feature)))
+      .collect { case p if p.products.nonEmpty =>
+        slugifySpace(p.query) -> ThinQuery(p.date, p.feature)
+      }
       .groupByKey()
-      .map({ case (k, v) => (k, (v.toList.size, v.toList.maxBy(_._1)))})
-      .filter({ case (k, (s, (d, f))) => f == "standard"})
-      .map({ case (k, (s, (d, f))) => (k, s)})
+      .collect { case (k, queries) if queries.maxBy(_.date).feature == "standard" =>
+        k -> queries.size
+      }
 
     val rankedQueriesByClicks = clickLogs
       .filter(p => p.feature == "search")
