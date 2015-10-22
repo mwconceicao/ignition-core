@@ -72,7 +72,7 @@ object SitemapXMLJob {
 
 object SitemapXMLSearchJob {
 
-  case class ThinQuery(date: DateTime, feature: String)
+  case class TinySearchLog(date: DateTime, feature: String)
 
   def generateSearchUrlXMLs(sc: SparkContext,
                             now: DateTime,
