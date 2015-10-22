@@ -78,9 +78,12 @@ object SitemapXMLSearchJob {
                             clickLogs: RDD[SearchClickLog],
                             config: SitemapConfig): RDD[String] = {
     val rankedQueries = searchLogs
-      .filter(p => p.feature == "standard" && p.products.nonEmpty)
-      .map(p => (slugifySpace(p.query), 1))
-      .reduceByKey(_ + _)
+      .filter(p => p.products.nonEmpty)
+      .map(p => (slugifySpace(p.query), (p.date, p.feature)))
+      .groupByKey()
+      .map({ case (k, v) => (k, (v.toList.size, v.toList.maxBy(_._1)))})
+      .filter({ case (k, (s, (d, f))) => f == "standard"})
+      .map({ case (k, (s, (d, f))) => (k, s)})
 
     val rankedQueriesByClicks = clickLogs
       .filter(p => p.feature == "search")
