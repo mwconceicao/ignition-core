@@ -82,7 +82,6 @@ object SitemapXMLSearchJob {
                             config: SitemapConfig,
                             minQueryFrequence: Int = 3): RDD[String] = {
 
-
     val rankedQueries = searchLogs
       .collect { case p if p.products.nonEmpty =>
         slugifySpace(p.query) -> AccumulatedSearches(TinySearchLog(p.date, p.feature), 1)
