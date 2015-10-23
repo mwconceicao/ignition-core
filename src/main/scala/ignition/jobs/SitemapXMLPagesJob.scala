@@ -79,7 +79,10 @@ object SitemapXMLSearchJob {
                             now: DateTime,
                             searchLogs: RDD[SearchLog],
                             clickLogs: RDD[SearchClickLog],
-                            config: SitemapConfig): RDD[String] = {
+                            config: SitemapConfig,
+                            minQueryFrequence: Int = 3): RDD[String] = {
+
+
     val rankedQueries = searchLogs
       .collect { case p if p.products.nonEmpty =>
         slugifySpace(p.query) -> AccumulatedSearches(TinySearchLog(p.date, p.feature), 1)
@@ -88,7 +91,7 @@ object SitemapXMLSearchJob {
         val last = if (acc1.last.date.isAfter(acc2.last.date)) acc1.last else acc2.last
         AccumulatedSearches(last, acc1.total + acc2.total)
       }
-      .collect { case (k, acc) if acc.last.feature == "standard" =>
+      .collect { case (k, acc) if acc.last.feature == "standard" && acc.total > minQueryFrequence =>
         k -> acc.total
       }
 
