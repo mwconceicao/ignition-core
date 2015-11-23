@@ -22,7 +22,7 @@ sanity_check_job_timeout_minutes = 7
 spark_version = '1.3.0'
 master_ami_type = 'pvm'
 
-job_timeout_minutes = 240
+job_timeout_minutes = 480
 
 regions_conf = collections.OrderedDict([
     ('us-east-1', RegionConf('us-east-1', 'ami-5bb18832', 'ami-35b1885c', ['b', 'c', 'd', 'e'], 'vpc-d92a61bc',
