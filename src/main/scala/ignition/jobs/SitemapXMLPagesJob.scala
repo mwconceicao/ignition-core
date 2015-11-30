@@ -75,6 +75,12 @@ object SitemapXMLSearchJob {
   case class TinySearchLog(date: DateTime, feature: String)
   case class AccumulatedSearches(last: TinySearchLog, total: Int)
 
+  def isSexualQuery(query: String): Boolean = {
+    if (query == "sexo") true
+    else if (query.contains("sexo") && (query.contains("infant") || query.contains("crian") || query.contains("menor"))) true
+    else false
+  }
+
   def generateSearchUrlXMLs(sc: SparkContext,
                             now: DateTime,
                             searchLogs: RDD[SearchLog],
@@ -83,7 +89,7 @@ object SitemapXMLSearchJob {
                             minQueryFrequence: Int = 3): RDD[String] = {
 
     val rankedQueries = searchLogs
-      .collect { case p if p.products.nonEmpty =>
+      .collect { case p if p.products.nonEmpty && !isSexualQuery(p.query.toLowerCase) =>
         slugifySpace(p.query) -> AccumulatedSearches(TinySearchLog(p.date, p.feature), 1)
       }
       .reduceByKey { (acc1, acc2) =>
