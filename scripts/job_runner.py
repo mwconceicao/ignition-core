@@ -154,11 +154,11 @@ valid_queries_generation_cluster_options = [
     ClusterConf('d2.4xlarge', valid_queries_cluster_budget, 1, '14', '2', '40G', 'hvm'),
     ClusterConf('d2.2xlarge', valid_queries_cluster_budget, 1, '28', '1', '40G', 'hvm'),
 
-    ClusterConf('c3.8xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '40G', 'hvm'),
+    ClusterConf('c3.8xlarge', valid_queries_cluster_budget, 0.7, '32', '1', '40G', 'hvm'),
 
-    ClusterConf('hi1.4xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '40G', 'hvm'),
+    ClusterConf('hi1.4xlarge', valid_queries_cluster_budget, 0.7, '32', '1', '40G', 'hvm'),
 
-    ClusterConf('cc2.8xlarge', valid_queries_cluster_budget, 0.7, '8', '1', '40G', 'hvm'),
+    ClusterConf('cc2.8xlarge', valid_queries_cluster_budget, 0.7, '32', '1', '40G', 'hvm'),
 ]
 
 sitemap_generation_cluster_budget = 0.22 * 2 * 4 * 1.2 * 2
