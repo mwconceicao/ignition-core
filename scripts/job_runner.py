@@ -144,7 +144,7 @@ search_generation_cluster_options = [
     ClusterConf('cc2.8xlarge', search_generation_cluster_budget, 0.6, '2', '2', '15G', 'hvm'),
 ]
 
-valid_queries_cluster_budget = 0.26 * 2 * 3 * 1.2 * 2
+valid_queries_cluster_budget = 0.35 * 2 * 3 * 1.2 * 2
 valid_queries_generation_cluster_options = [
     ClusterConf('r3.8xlarge', valid_queries_cluster_budget, 0.7, '8', '4', '40G', 'hvm'),
     ClusterConf('r3.4xlarge', valid_queries_cluster_budget, 0.7, '16', '2', '40G', 'hvm'),
