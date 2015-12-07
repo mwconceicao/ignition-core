@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(script_path, '..', 'core', 'tools'))
 import cluster
 
 ## Pseudo-types definition
-ClusterConf = collections.namedtuple('ClusterConf', ['instance_type', 'hourly_budget', 'preference_rate', 'slaves', 'worker_instances', 'job_mem', 'ami_type'])
+ClusterConf = collections.namedtuple('ClusterConf', ['instance_type', 'hourly_budget', 'preference_rate', 'slaves', 'executor_instances', 'job_mem', 'ami_type'])
 RegionConf = collections.namedtuple('RegionConf', ['region', 'ami_pvm', 'ami_hvm', 'az_suffixes', 'vpc', 'subnet_by_az'])
 FullConf = collections.namedtuple('FullConf', ['cluster_conf', 'region_conf', 'az'])
 
@@ -19,8 +19,8 @@ default_security_group = 'Ignition'
 env = 'prod'
 sanity_check_job_name = 'HelloWorldSetup'
 sanity_check_job_timeout_minutes = 7
-spark_version = '1.3.0'
-master_ami_type = 'pvm'
+spark_version = '1.5.1'
+master_ami_type = 'hvm'
 
 job_timeout_minutes = 480
 
@@ -37,7 +37,8 @@ regions_conf = collections.OrderedDict([
 #    ('us-west-1', RegionConf('us-west-1', 'ami-7a320f3f', 'ami-72320f37', ['a', 'b', 'c'])),
 ])
 
-master_instance_type = 'm3.2xlarge'
+default_master_instance_type = 'm3.2xlarge'
+default_driver_heap_size = '25G'
 runner_eid = "runner-{0}".format(uuid.uuid4())
 victorops_url = "https://alert.victorops.com/integrations/generic/20131114/alert/TBD"
 
@@ -429,7 +430,7 @@ def get_master_ami(full_conf):
     else:
         return full_conf.region_conf.ami_pvm
 
-def ensure_cluster(cluster_name, cluster_options, full_conf, blacklisted_confs, collect_results_dir, entity_id, disable_vpc, spark_version=spark_version, security_group=default_security_group, tag=[]):
+def ensure_cluster(cluster_name, cluster_options, full_conf, blacklisted_confs, collect_results_dir, entity_id, disable_vpc, spark_version=spark_version, security_group=default_security_group, tag=[], master_instance_type=default_master_instance_type):
     while True:
         try:
             full_conf = load_conf_from_cluster(cluster_name)
@@ -452,12 +453,13 @@ def ensure_cluster(cluster_name, cluster_options, full_conf, blacklisted_confs, 
                                instance_type=full_conf.cluster_conf.instance_type,
                                ondemand=ondemand,
                                spot_price=spot_price,
+                               master_spot=True,
                                ami=get_ami_for(full_conf),
                                master_ami=get_master_ami(full_conf),
-                               worker_instances=str(full_conf.cluster_conf.worker_instances),
+                               executor_instances=str(full_conf.cluster_conf.executor_instances),
                                zone=full_conf.az,
-                               vpc = full_conf.region_conf.vpc if not disable_vpc else None,
-                               vpc_subnet = full_conf.region_conf.subnet_by_az.get(full_conf.az) if not disable_vpc else None,
+                               vpc=full_conf.region_conf.vpc if not disable_vpc else None,
+                               vpc_subnet=full_conf.region_conf.subnet_by_az.get(full_conf.az) if not disable_vpc else None,
                                just_ignore_existing=False,
                                spark_version=spark_version,
                                security_group=security_group, env=env,
@@ -489,14 +491,14 @@ Exception is: {1}
     return full_conf
 
 
-def run_job(cluster_name, job_name, full_conf, collect_results_dir, consecutive_failures=0, max_errors_on_healthy_cluster = 5, entity_id=runner_eid):
+def run_job(cluster_name, job_name, full_conf, collect_results_dir, consecutive_failures=0, max_errors_on_healthy_cluster=5, entity_id=runner_eid, driver_heap_size=default_driver_heap_size):
     while True:
         try:
             log.info('Running {}'.format(job_name))
             cluster_job_run(cluster_name=cluster_name, job_name=job_name, job_mem=full_conf.cluster_conf.job_mem,
-                            region=full_conf.region_conf.region, job_timeout_minutes=(job_timeout_minutes),
+                            region=full_conf.region_conf.region, job_timeout_minutes=job_timeout_minutes,
                             collect_results_dir=collect_results_dir,
-                            detached=True, kill_on_failure=True, disable_assembly_build=True)
+                            detached=True, kill_on_failure=True, disable_assembly_build=True, driver_heap_size=driver_heap_size)
             consecutive_failures = 0
             notify('Job execution completed successfully :)', severity="RESOLVE", entity_id=entity_id)
             return (True, 0)
@@ -508,8 +510,7 @@ def run_job(cluster_name, job_name, full_conf, collect_results_dir, consecutive_
 But don't panic. We will try again. See log for more details.
 We had {0} consecutive failures of maximum of {1}.
 Exception is: {2}
-"""
-                   .format(consecutive_failures, max_errors_on_healthy_cluster, traceback.format_exc()), severity="WARNING", entity_id=entity_id)
+""".format(consecutive_failures, max_errors_on_healthy_cluster, traceback.format_exc()), severity="WARNING", entity_id=entity_id)
             try:
                 run_sanity_checks(collect_results_dir, full_conf, cluster_name)
                 if consecutive_failures >= max_errors_on_healthy_cluster:
@@ -525,8 +526,8 @@ Exception is: {2}
                 return (False, consecutive_failures)
 
 
-def setup(job_name):
-    setup_eid = "{0}-{1}".format(job_name, runner_eid)
+def setup(jobs_names):
+    setup_eid = "{0}-{1}".format(','.join(jobs_names), runner_eid)
     notify("Initializing job runner\nIt's a pleasure to be back.", severity="INFO", entity_id=setup_eid)
     while True:
         try:
@@ -542,13 +543,13 @@ def setup(job_name):
 from argh import *
 
 
-def run_continuously(collect_results_dir, namespace_, job_name, cluster_name_prefix, cluster_options,
-                     disable_vpc=False, security_group=default_security_group, tag=[], max_errors_on_healthy_cluster = 5):
+def run_continuously(collect_results_dir, namespace_, jobs_names, cluster_name_prefix, cluster_options,
+                     disable_vpc=False, security_group=default_security_group, tag=[], max_errors_on_healthy_cluster=5,
+                     master_instance_type=default_master_instance_type, driver_heap_size=default_driver_heap_size):
     global namespace, current_job
     namespace = namespace_
-    current_job = job_name
 
-    setup(job_name)
+    setup(jobs_names)
 
     consecutive_failures = 0
 
@@ -561,29 +562,37 @@ def run_continuously(collect_results_dir, namespace_, job_name, cluster_name_pre
     def inotify(message, severity="CRITICAL"):
         return notify(message, severity, entity_id=entity_id)
 
+    cluster_cycle = itertools.cycle(jobs_names)
+    current_job = job_name = cluster_cycle.next()
     while True:
         try:
             full_conf = ensure_cluster(cluster_name, cluster_options, full_conf,
-                                       blacklisted_confs, collect_results_dir, entity_id, disable_vpc, security_group=security_group, tag=tag)
+                                       blacklisted_confs, collect_results_dir, entity_id, disable_vpc, security_group=security_group, tag=tag, master_instance_type=master_instance_type)
             while True:
+                start_time = time.time()
                 success, consecutive_failures = run_job(cluster_name, job_name, full_conf, collect_results_dir,
-                                                        consecutive_failures, max_errors_on_healthy_cluster, entity_id)
-                if not success:
-                    break
+                                                        consecutive_failures, max_errors_on_healthy_cluster, entity_id, driver_heap_size=driver_heap_size)
+                send_job_duration(start_time, job_name, full_conf, success=success)
+                if success:
+                    current_job = job_name = cluster_cycle.next()
+                else:
+                    break # will check cluster
 
         except Exception as e:
             log.exception('Completely unknown exception')
             inotify("Completely unknown exception\nTime to panic. Exception is: " + traceback.format_exc())
 
 
-def run_once(collect_results_dir, namespace_, job_name, cluster_name_prefix, cluster_options,
-             disable_vpc=False, security_group=default_security_group, tag=[], max_errors_on_healthy_cluster = 3):
+
+def run_once(collect_results_dir, namespace_, jobs_names, cluster_name_prefix, cluster_options,
+             disable_vpc=False, security_group=default_security_group, tag=[], max_errors_on_healthy_cluster=3,
+             master_instance_type=default_master_instance_type, driver_heap_size=default_driver_heap_size):
 
     global namespace, current_job
     namespace = namespace_
-    current_job = job_name
 
-    setup(job_name)
+
+    setup(jobs_names)
 
     consecutive_failures = 0
 
@@ -595,29 +604,41 @@ def run_once(collect_results_dir, namespace_, job_name, cluster_name_prefix, clu
     def inotify(message, severity="CRITICAL"):
         return notify(message, severity, entity_id=entity_id)
 
-    while True:
+    jobs_names_iter = iter(jobs_names)
+    current_job = job_name = jobs_names_iter.next()
+
+    continue_processing = True
+    while continue_processing:
         try:
             full_conf = ensure_cluster(cluster_name, cluster_options, full_conf,
-                                       blacklisted_confs, collect_results_dir, entity_id, disable_vpc, security_group=security_group, tag=tag)
-            success, consecutive_failures = run_job(cluster_name, job_name, full_conf, collect_results_dir,
-                                                    consecutive_failures, max_errors_on_healthy_cluster, entity_id)
-            if success:
-                break
-            elif consecutive_failures >= max_errors_on_healthy_cluster:
-                message = 'We had {0} consecutive failures of maximum of {1}.\nTime to panic. All processing is halted!'.format(consecutive_failures, max_errors_on_healthy_cluster)
-                log.error(message)
-                inotify(message)
-                break
+                                       blacklisted_confs, collect_results_dir, entity_id, disable_vpc,
+                                       security_group=security_group, tag=tag, master_instance_type=master_instance_type)
+            while continue_processing:
+                start_time = time.time()
+                success, consecutive_failures = run_job(cluster_name, job_name, full_conf, collect_results_dir,
+                                                        consecutive_failures, max_errors_on_healthy_cluster, entity_id, driver_heap_size=driver_heap_size)
+                send_job_duration(start_time, job_name, full_conf, success=success)
+                if success:
+                    current_job = job_name = jobs_names_iter.next()
+                elif consecutive_failures >= max_errors_on_healthy_cluster:
+                    message = 'We had {0} consecutive failures of maximum of {1}.\nTime to panic. All processing is halted!'.format(consecutive_failures, max_errors_on_healthy_cluster)
+                    log.error(message)
+                    inotify(message)
+                    continue_processing = False
+                else:
+                    break # will check cluster
+        except StopIteration:
+            continue_processing = False
         except Exception as e:
             log.exception('Completely unknown exception')
             inotify("Completely unknown exception\nTime to panic. Exception is: " + traceback.format_exc())
     destroy_all_clusters(cluster_name)
 
 
-def sitemap_generation(collect_results_dir, disable_vpc = False, security_group = default_security_group):
+def sitemap_generation(collect_results_dir, disable_vpc=False, security_group=default_security_group):
     run_once(collect_results_dir,
             "sitemaps",
-             job_name="SitemapXMLSetup",
+             jobs_names=["SitemapXMLSetup"],
              cluster_name_prefix="sitemap-generation",
              cluster_options=sitemap_generation_cluster_options,
              disable_vpc=disable_vpc,
@@ -625,25 +646,26 @@ def sitemap_generation(collect_results_dir, disable_vpc = False, security_group 
              tag=["chaordic:role=gen.sitemap"])
 
 
-def search_etl(collect_results_dir, disable_vpc = False, security_group = default_security_group):
+def search_etl(collect_results_dir, disable_vpc=False, security_group=default_security_group):
     run_once(collect_results_dir,
              "search_etl",
-             job_name="SearchETLSetup",
+             jobs_names=["SearchETLSetup"],
              cluster_name_prefix="search-etl-generation",
              cluster_options=search_generation_cluster_options,
              disable_vpc=disable_vpc,
              security_group=security_group,
              tag=["chaordic:role=gen.gen.searchetl"])
 
-def valid_queries(collect_results_dir, disable_vpc = False, security_group = default_security_group):
+def valid_queries(collect_results_dir, disable_vpc=False, security_group=default_security_group):
     run_once(collect_results_dir,
              "valid_queries",
-             job_name="ValidQueriesSetup",
+             jobs_names=["ValidQueriesSetup"],
              cluster_name_prefix="valid-queries-generation",
              cluster_options=valid_queries_generation_cluster_options,
              disable_vpc=disable_vpc,
              security_group=security_group,
-             tag=["chaordic:role=gen.validqueries"])
+             tag=["chaordic:role=gen.validqueries"],
+             driver_heap_size='50G')
 
 class ExpireCollection:
     """

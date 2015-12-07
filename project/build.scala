@@ -18,7 +18,7 @@ object IgnitionBuild extends Build {
       runMain in Compile <<= Defaults.runMainTask(fullClasspath in Compile, runner in (Compile, runMain)),
       resolvers += "Cloudera Repository" at "https://repository.cloudera.com/artifactory/cloudera-repos/",
       libraryDependencies ++= Seq(
-        ("org.apache.spark" %% "spark-core" % "1.3.0" % "provided").exclude("org.apache.hadoop", "hadoop-client"),
+        ("org.apache.spark" %% "spark-core" % "1.5.1" % "provided").exclude("org.apache.hadoop", "hadoop-client"),
         "org.apache.hadoop" % "hadoop-client" % "2.0.0-cdh4.7.1" % "provided",
         "com.timgroup" %  "java-statsd-client"  % "3.0.2",
         "ch.qos.logback" % "logback-classic" % "1.0.13",

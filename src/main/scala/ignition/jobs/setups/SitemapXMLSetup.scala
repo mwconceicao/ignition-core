@@ -66,14 +66,14 @@ object SitemapXMLSetup extends ExecutionRetry {
 
     logger.info(s"Do we need search logs? $willNeedSearch")
     val parsedClickLogs = if (willNeedSearch)
-      EntitiesLayer.parseSearchClickLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
+      EntitiesLayer.parseSearchClickLogs(sc.filterAndGetParallelTextFiles("s3n://chaordic-search-logs/clicklog/*",
         endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay())), setupName)
         .persist(StorageLevel.MEMORY_AND_DISK)
     else
       sc.emptyRDD[SearchClickLog]
 
     val parsedSearchLogs = if (willNeedSearch)
-      EntitiesLayer.parseSearchLogs(sc.filterAndGetTextFiles("s3n://chaordic-search-logs/searchlog/*",
+      EntitiesLayer.parseSearchLogs(sc.filterAndGetParallelTextFiles("s3n://chaordic-search-logs/searchlog/*",
         endDate = Option(now), startDate = Option(now.minusDays(30).withTimeAtStartOfDay())), setupName)
         .persist(StorageLevel.MEMORY_AND_DISK)
     else
@@ -84,7 +84,7 @@ object SitemapXMLSetup extends ExecutionRetry {
       try {
         logger.info(s"Starting processing for client $apiKey")
         val pageUrls = if (conf.generatePages) {
-          val products = parseProducts(sc.filterAndGetTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz",
+          val products = parseProducts(sc.filterAndGetParallelTextFiles(s"s3n://platform-dumps-virginia/products/*/$apiKey.gz",
             endDate = Option(now), lastN = Option(1)).repartition(500))
           SitemapXMLPagesJob.generatePagesUrlXMLs(sc, now, products, conf)
         } else {

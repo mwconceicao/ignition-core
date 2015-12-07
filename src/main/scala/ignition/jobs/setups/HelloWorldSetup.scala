@@ -3,7 +3,7 @@ package ignition.jobs.setups
 import ignition.core.jobs.CoreJobRunner.RunnerContext
 import ignition.core.jobs.ExecutionRetry
 import ignition.core.jobs.utils.SparkContextUtils._
-// filterAndGetTextFiles requires a date extractor:
+// filterAndGetParallelTextFiles requires a date extractor:
 import ignition.core.jobs.utils.SimplePathDateExtractor.default
 
 // This job is also used as a Sanity Check for cluster initialization
@@ -15,7 +15,7 @@ object HelloWorldSetup extends ExecutionRetry {
     val now = runnerContext.config.date
 
     val count = executeRetrying {
-      val somedata = sc.filterAndGetTextFiles("s3n://chaordic-search-logs/clicklog/*",
+      val somedata = sc.filterAndGetParallelTextFiles("s3n://chaordic-search-logs/clicklog/*",
         lastN = Option(1), endDate = Option(now),
         synchLocally = true, forceSynch = true)
 

@@ -73,7 +73,7 @@ trait SearchETL {
     val paths = for { date <- dateRangeByDay(start, end) } yield {
       s"s3n://chaordic-search-logs/autocompletelog/${date.toString("yyyy-MM-dd")}/*.gz"
     }
-    EntitiesLayer.parseSearchLogs(context.getTextFiles(paths), setupName)
+    EntitiesLayer.parseSearchLogs(context.getParallelTextFiles(paths), setupName)
   }
 
   def parseSearchLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchLog] = {
@@ -81,7 +81,7 @@ trait SearchETL {
     val paths = for { date <- dateRangeByDay(start, end) } yield {
       s"s3n://chaordic-search-logs/searchlog/${date.toString("yyyy-MM-dd")}/*.gz"
     }
-    EntitiesLayer.parseSearchLogs(context.getTextFiles(paths), setupName)
+    EntitiesLayer.parseSearchLogs(context.getParallelTextFiles(paths), setupName)
   }
 
   def parseClickLogs(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[SearchClickLog] = {
@@ -89,7 +89,7 @@ trait SearchETL {
     val paths = for { date <- dateRangeByDay(start, end) } yield {
       s"s3n://chaordic-search-logs/clicklog/${date.toString("yyyy-MM-dd")}/*.gz"
     }
-    EntitiesLayer.parseSearchClickLogs(context.getTextFiles(paths), setupName)
+    EntitiesLayer.parseSearchClickLogs(context.getParallelTextFiles(paths), setupName)
   }
 
   def parseTransactions(setupName: String, context: SparkContext, start: DateTime, end: DateTime): RDD[Transaction] = {
@@ -97,7 +97,7 @@ trait SearchETL {
     val paths = for { date <- dateRangeByDay(start, end) } yield {
       s"s3n://platform-dumps-virginia/buyOrders/${date.toString("yyyy-MM-dd")}/*.gz"
     }
-    EntitiesLayer.parseTransactions(context.getTextFiles(paths), setupName)
+    EntitiesLayer.parseTransactions(context.getParallelTextFiles(paths), setupName)
   }
 
   def dateRangeByDay(start: DateTime, end: DateTime): Seq[DateTime] = {
